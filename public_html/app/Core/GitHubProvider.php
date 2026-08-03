@@ -53,7 +53,7 @@ final class GitHubProvider implements GitProvider
             throw new \InvalidArgumentException('履歴参照が不正です。');
         }
         $data = $this->request('GET', '/repos/' . $this->repo($this->config->contentRepository) . '/contents/' . $this->encodePath($path) . '?ref=' . rawurlencode($ref));
-        return base64_decode((string) ($data['content'] ?? ''), true) ?: '';
+        return $this->decodeContentResponse($data);
     }
 
     public function saveContent(string $path, string $bytes, string $message): void
@@ -83,7 +83,7 @@ final class GitHubProvider implements GitProvider
         }
         $this->assertPublicPath($path);
         $data = $this->request('GET', '/repos/' . $this->repo($this->config->publicRepository) . '/contents/' . $this->encodePath($path) . '?ref=' . rawurlencode($this->config->branch));
-        return base64_decode((string) ($data['content'] ?? ''), true) ?: '';
+        return $this->decodeContentResponse($data);
     }
 
     public function savePublicContent(string $path, string $bytes, string $message): void
@@ -95,7 +95,7 @@ final class GitHubProvider implements GitProvider
     public function saveOperationLog(array $event): void
     {
         $event['recorded_at'] = gmdate(DATE_ATOM);
-        $event['version'] = 'v.0.1';
+        $event['version'] = Config::VERSION;
         $bytes = json_encode($event, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         if ($bytes === false) {
             throw new \RuntimeException('運用履歴をJSON化できません。');
@@ -108,7 +108,7 @@ final class GitHubProvider implements GitProvider
     {
         $this->assertContentPath($path);
         $data = $this->request('GET', '/repos/' . $this->repo($repository) . '/contents/' . $this->encodePath($path) . '?ref=' . rawurlencode($this->config->branch));
-        return base64_decode((string) ($data['content'] ?? ''), true) ?: '';
+        return $this->decodeContentResponse($data);
     }
 
     private function saveToRepository(string $repository, string $path, string $bytes, string $message, bool $publicPath = false): void
@@ -122,8 +122,10 @@ final class GitHubProvider implements GitProvider
         try {
             $existing = $this->request('GET', '/repos/' . $this->repo($repository) . '/contents/' . $this->encodePath($path) . '?ref=' . rawurlencode($this->config->branch));
             $sha = (string) ($existing['sha'] ?? '');
-        } catch (\RuntimeException) {
-            $sha = null;
+        } catch (\RuntimeException $error) {
+            if (!str_contains($error->getMessage(), ' 404 ')) {
+                throw $error;
+            }
         }
 
         $payload = [
@@ -154,8 +156,12 @@ final class GitHubProvider implements GitProvider
             ],
         ];
         if ($payload !== null) {
+            $content = json_encode($payload, JSON_UNESCAPED_SLASHES);
+            if ($content === false) {
+                throw new \RuntimeException('GitHub API request payload is invalid.');
+            }
             $context['http']['header'] .= "\r\nContent-Type: application/json";
-            $context['http']['content'] = json_encode($payload, JSON_UNESCAPED_SLASHES);
+            $context['http']['content'] = $content;
         }
 
         $body = file_get_contents(self::API . $path, false, stream_context_create($context));
@@ -168,6 +174,22 @@ final class GitHubProvider implements GitProvider
             throw new \RuntimeException('GitHub API response is invalid.');
         }
         return $decoded;
+    }
+
+    private function decodeContentResponse(array $data): string
+    {
+        if (($data['type'] ?? '') !== 'file' || !isset($data['content']) || !is_string($data['content'])) {
+            throw new \RuntimeException('GitHub API response is not a file content.');
+        }
+        $content = preg_replace('/\s+/', '', $data['content']);
+        if (!is_string($content)) {
+            throw new \RuntimeException('GitHub API content cannot be normalized.');
+        }
+        $bytes = base64_decode($content, true);
+        if ($bytes === false) {
+            throw new \RuntimeException('GitHub API content cannot be decoded.');
+        }
+        return $bytes;
     }
 
     private function repo(string $repository): string

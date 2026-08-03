@@ -49,6 +49,17 @@ final class Auth
     public function logout(): void
     {
         $_SESSION = [];
+        if (ini_get('session.use_cookies')) {
+            $params = session_get_cookie_params();
+            setcookie(session_name(), '', [
+                'expires' => time() - 42000,
+                'path' => $params['path'],
+                'domain' => $params['domain'],
+                'secure' => $params['secure'],
+                'httponly' => $params['httponly'],
+                'samesite' => $params['samesite'] ?? 'Strict',
+            ]);
+        }
         session_destroy();
     }
 
@@ -88,7 +99,11 @@ final class Auth
             'created_at' => gmdate(DATE_ATOM),
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 
-        file_put_contents($this->authFile, $payload, LOCK_EX);
-        chmod($this->authFile, 0600);
+        if ($payload === false || file_put_contents($this->authFile, $payload, LOCK_EX) === false) {
+            throw new \RuntimeException('認証情報を書き込めません。');
+        }
+        if (!chmod($this->authFile, 0600)) {
+            throw new \RuntimeException('認証情報の権限を設定できません。');
+        }
     }
 }

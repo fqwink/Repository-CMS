@@ -60,8 +60,12 @@ final class StaticGenerator
             Security::validateContent($path, $bytes);
             $extension = Security::allowedExtension($path);
             if ($extension === 'md') {
+                $target = preg_replace('/\.md$/', '.html', $path);
+                if (!is_string($target) || $target === '') {
+                    throw new \RuntimeException('静的生成パスを作成できません。');
+                }
                 $outputs[] = [
-                    'path' => preg_replace('/\.md$/', '.html', $path),
+                    'path' => $target,
                     'bytes' => '<!doctype html><meta charset="utf-8">' . $this->renderer->markdown($bytes),
                 ];
             } elseif (in_array($extension, ['json', 'png', 'svg'], true)) {

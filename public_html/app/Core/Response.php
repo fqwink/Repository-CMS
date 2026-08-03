@@ -20,7 +20,7 @@ final class Response
         echo '<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
         echo '<title>' . self::escape($title) . ' - Repository CMS</title>';
         echo '<style>' . self::style() . '</style></head><body>';
-        echo '<header><h1>Repository CMS</h1>' . $nav . '</header><main>' . $lockHtml . $body . '</main></body></html>';
+        echo '<header><h1>Repository CMS <span class="muted">' . self::escape(Config::VERSION) . '</span></h1>' . $nav . '</header><main>' . $lockHtml . $body . '</main></body></html>';
     }
 
     public static function redirect(string $to): never

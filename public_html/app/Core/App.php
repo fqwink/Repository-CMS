@@ -28,6 +28,7 @@ final class App
                 return;
             }
             if ($action === 'logout') {
+                $this->runtime->auth->requireLogin();
                 $user = $this->runtime->auth->user();
                 $this->audit('auth.logout', ['user' => $user]);
                 $this->runtime->auth->logout();
@@ -133,7 +134,10 @@ final class App
     private function submittedBytes(): string
     {
         $file = $_FILES['content_file'] ?? null;
-        if (is_array($file) && ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+        if (!is_array($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+            return (string) ($_POST['body'] ?? '');
+        }
+        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
             $tmpName = (string) ($file['tmp_name'] ?? '');
             if ($tmpName === '' || !is_uploaded_file($tmpName)) {
                 throw new \RuntimeException('アップロードファイルを確認できません。');
@@ -144,7 +148,7 @@ final class App
             }
             return $bytes;
         }
-        return (string) $_POST['body'];
+        throw new \RuntimeException('アップロードに失敗しました。');
     }
 
     private function history(string $path): void

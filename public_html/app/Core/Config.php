@@ -6,6 +6,8 @@ namespace RepositoryCms\Core;
 
 final class Config
 {
+    public const VERSION = 'v.0.1';
+
     public function __construct(
         public readonly string $provider,
         public readonly string $githubToken,
