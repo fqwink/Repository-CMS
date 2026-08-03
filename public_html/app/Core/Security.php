@@ -30,6 +30,29 @@ final class Security
         return $extension;
     }
 
+    public static function validateContent(string $path, string $bytes): void
+    {
+        $extension = self::allowedExtension($path);
+        if ($extension === 'json') {
+            json_decode($bytes, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                throw new \InvalidArgumentException('JSONの形式が不正です。');
+            }
+            return;
+        }
+        if ($extension === 'png' && !str_starts_with($bytes, "\x89PNG\r\n\x1a\n")) {
+            throw new \InvalidArgumentException('PNGの形式が不正です。');
+        }
+        if ($extension === 'svg') {
+            if (!preg_match('/<svg[\s>]/i', $bytes)) {
+                throw new \InvalidArgumentException('SVGの形式が不正です。');
+            }
+            if (preg_match('/<script[\s>]|on[a-z]+\s*=/i', $bytes)) {
+                throw new \InvalidArgumentException('SVGに許可されていないスクリプト要素があります。');
+            }
+        }
+    }
+
     public static function validPublicPath(string $path): bool
     {
         if ($path === '' || str_starts_with($path, '/') || str_contains($path, '..')) {

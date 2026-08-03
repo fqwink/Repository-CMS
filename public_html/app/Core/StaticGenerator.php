@@ -57,6 +57,7 @@ final class StaticGenerator
         foreach ($this->runtime->git->listContent() as $item) {
             $path = (string) $item['path'];
             $bytes = $this->runtime->git->readContent($path);
+            Security::validateContent($path, $bytes);
             $extension = Security::allowedExtension($path);
             if ($extension === 'md') {
                 $outputs[] = [

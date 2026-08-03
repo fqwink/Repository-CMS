@@ -28,7 +28,7 @@ final class ContentManager
         if ($this->runtime->locks->locked()) {
             throw new \RuntimeException('CMSがロックされています。');
         }
-        Security::allowedExtension($path);
+        Security::validateContent($path, $bytes);
         $workPath = $this->runtime->workData->write(basename($path), $bytes);
         $checksum = $this->runtime->workData->checksum($bytes);
         if (!$this->runtime->workData->verified($workPath, $checksum)) {

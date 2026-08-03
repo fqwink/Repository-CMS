@@ -8,11 +8,12 @@ final class Renderer
 {
     public function preview(string $path, string $bytes): string
     {
+        Security::validateContent($path, $bytes);
         return match (Security::allowedExtension($path)) {
             'md' => $this->markdown($bytes),
             'json' => '<pre>' . Response::escape($this->json($bytes)) . '</pre>',
             'svg' => '<pre>' . Response::escape($bytes) . '</pre>',
-            'png' => '<p class="muted">PNGは保存対象です。プレビューはGitプロバイダーURL確定後に表示します。</p>',
+            'png' => '<img alt="" style="max-width:100%;height:auto" src="data:image/png;base64,' . base64_encode($bytes) . '">',
             default => '',
         };
     }

@@ -102,9 +102,12 @@ final class App
     {
         $value = '';
         if ($path !== null && $path !== '') {
-            $value = $this->content->read($path);
+            $extension = Security::allowedExtension($path);
+            if ($extension !== 'png') {
+                $value = $this->content->read($path);
+            }
         }
-        $body = '<section class="panel"><h2>編集</h2><form method="post" action="?action=save"><input type="hidden" name="csrf" value="' . Security::csrfToken() . '"><label>パス</label><input name="path" value="' . Response::escape($path ?? '') . '" placeholder="pages/index.md" required><label>内容</label><textarea name="body">' . Response::escape($value) . '</textarea><p class="row"><button>保存</button><button class="button secondary" formaction="?action=preview" formmethod="post">プレビュー</button></p></form></section>';
+        $body = '<section class="panel"><h2>編集</h2><form method="post" enctype="multipart/form-data" action="?action=save"><input type="hidden" name="csrf" value="' . Security::csrfToken() . '"><label>パス</label><input name="path" value="' . Response::escape($path ?? '') . '" placeholder="pages/index.md" required><label>内容</label><textarea name="body">' . Response::escape($value) . '</textarea><label>ファイル</label><input name="content_file" type="file" accept=".md,.json,.png,.svg"><p class="row"><button>保存</button><button class="button secondary" formaction="?action=preview" formmethod="post">プレビュー</button></p></form></section>';
         Response::html('編集', $body, $this->runtime);
     }
 
@@ -112,7 +115,7 @@ final class App
     {
         Security::requireCsrf();
         $path = (string) $_POST['path'];
-        $body = (string) $_POST['body'];
+        $body = $this->submittedBytes();
         $this->content->save($path, $body);
         $this->audit('content.save', ['path' => $path, 'user' => $this->runtime->auth->user()]);
         Response::redirect('?action=edit&path=' . rawurlencode($path));
@@ -122,9 +125,26 @@ final class App
     {
         Security::requireCsrf();
         $path = (string) $_POST['path'];
-        $body = (string) $_POST['body'];
+        $body = $this->submittedBytes();
         $preview = $this->renderer->preview($path, $body);
         Response::html('プレビュー', '<section class="panel"><h2>' . Response::escape($path) . '</h2><div class="preview">' . $preview . '</div></section>', $this->runtime);
+    }
+
+    private function submittedBytes(): string
+    {
+        $file = $_FILES['content_file'] ?? null;
+        if (is_array($file) && ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+            $tmpName = (string) ($file['tmp_name'] ?? '');
+            if ($tmpName === '' || !is_uploaded_file($tmpName)) {
+                throw new \RuntimeException('アップロードファイルを確認できません。');
+            }
+            $bytes = file_get_contents($tmpName);
+            if ($bytes === false) {
+                throw new \RuntimeException('アップロードファイルを読み取れません。');
+            }
+            return $bytes;
+        }
+        return (string) $_POST['body'];
     }
 
     private function history(string $path): void
