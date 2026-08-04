@@ -15,4 +15,6 @@ interface GitProvider
     public function readPublicContent(string $path): string;
     public function savePublicContent(string $path, string $bytes, string $message): void;
     public function saveOperationLog(array $event): void;
+    public function listUpdateReleases(): array;
+    public function readUpdateFile(string $path): string;
 }

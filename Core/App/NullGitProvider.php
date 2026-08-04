@@ -50,4 +50,14 @@ final class NullGitProvider implements GitProvider
     {
         throw new \RuntimeException('Gitプロバイダーが未設定です。');
     }
+
+    public function listUpdateReleases(): array
+    {
+        return [];
+    }
+
+    public function readUpdateFile(string $path): string
+    {
+        throw new \RuntimeException('Gitプロバイダーが未設定です。');
+    }
 }

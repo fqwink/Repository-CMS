@@ -65,6 +65,14 @@ final class Security
         return in_array($extension, self::PUBLIC_EXTENSIONS, true);
     }
 
+    public static function validRepositoryPath(string $path): bool
+    {
+        if ($path === '' || str_starts_with($path, '/') || str_contains($path, '..')) {
+            return false;
+        }
+        return preg_match('/^[A-Za-z0-9_\/.-]+$/', $path) === 1;
+    }
+
     public static function csrfToken(): string
     {
         if (!isset($_SESSION['csrf'])) {

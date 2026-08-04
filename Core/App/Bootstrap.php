@@ -19,9 +19,9 @@ spl_autoload_register(static function (string $class): void {
 
 final class Bootstrap
 {
-    public static function run(string $publicRoot): void
+    public static function run(string $coreRoot): void
     {
-        $runtime = Runtime::create($publicRoot);
+        $runtime = Runtime::create($coreRoot);
         (new App($runtime))->handle();
     }
 }

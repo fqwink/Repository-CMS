@@ -59,6 +59,7 @@ final class LockManager
         return [
             'locked' => (bool) ($payload['locked'] ?? true),
             'reason' => (string) ($payload['reason'] ?? ''),
+            'created_at' => (string) ($payload['created_at'] ?? ''),
         ];
     }
 

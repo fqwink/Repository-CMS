@@ -15,7 +15,7 @@ final class Response
         $lockHtml = $lock['locked']
             ? '<div class="alert">CMS LOCKED: ' . self::escape($lock['reason']) . '</div>'
             : '';
-        $nav = $user === null ? '' : '<nav><a href="?">一覧</a><a href="?action=new">作成</a><a href="?action=generate">静的生成</a><a href="?action=publish">公開</a><a href="?action=logout">ログアウト</a></nav>';
+        $nav = $user === null ? '' : '<nav><a href="?">一覧</a><a href="?action=new">作成</a><a href="?action=generate">静的生成</a><a href="?action=publish">公開</a><a href="?action=updates">アップデート</a><a href="?action=logout">ログアウト</a></nav>';
 
         echo '<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
         echo '<title>' . self::escape($title) . ' - Repository CMS</title>';

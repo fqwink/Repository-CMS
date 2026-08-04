@@ -6,7 +6,7 @@ namespace RepositoryCms\Core;
 
 final class Config
 {
-    public const VERSION = 'v.0.1';
+    public const VERSION = 'v.0.3';
 
     public function __construct(
         public readonly string $provider,
@@ -15,6 +15,9 @@ final class Config
         public readonly string $contentRepository,
         public readonly string $publicRepository,
         public readonly string $opsRepository,
+        public readonly string $updateRepository,
+        public readonly string $updateBranch,
+        public readonly string $updateManifestPath,
         public readonly string $branch,
     ) {
     }
@@ -28,6 +31,9 @@ final class Config
             (string) getenv('REPOSITORY_CMS_CONTENT_REPO'),
             (string) getenv('REPOSITORY_CMS_PUBLIC_REPO'),
             (string) getenv('REPOSITORY_CMS_OPS_REPO'),
+            (string) getenv('REPOSITORY_CMS_UPDATE_REPO'),
+            (string) (getenv('REPOSITORY_CMS_UPDATE_BRANCH') ?: 'main'),
+            (string) (getenv('REPOSITORY_CMS_UPDATE_MANIFEST') ?: 'updates/releases.json'),
             (string) (getenv('REPOSITORY_CMS_BRANCH') ?: 'main'),
         );
     }
@@ -40,5 +46,13 @@ final class Config
             && $this->contentRepository !== ''
             && $this->publicRepository !== ''
             && $this->opsRepository !== '';
+    }
+
+    public function updateConfigured(): bool
+    {
+        return $this->gitConfigured()
+            && $this->updateRepository !== ''
+            && $this->updateBranch !== ''
+            && $this->updateManifestPath !== '';
     }
 }

@@ -40,6 +40,9 @@ final class WorkData
     public function cleanupAfterVerified(): void
     {
         foreach (new \FilesystemIterator($this->workRoot, \FilesystemIterator::SKIP_DOTS) as $item) {
+            if ($item->getFilename() === '.gitignore') {
+                continue;
+            }
             if (!$this->deletePath($item->getPathname())) {
                 $this->locks->lock('作業データの削除に失敗しました。');
                 throw new \RuntimeException('作業データの削除に失敗しました。');

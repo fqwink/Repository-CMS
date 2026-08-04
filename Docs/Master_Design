@@ -1,0 +1,319 @@
+# Repository CMS
+
+# マスター設計書
+
+**Version:** v.0.3
+
+---
+
+# 1. 設計目的
+
+本設計書は、`Docs/Master_Spec` v.0.3 に基づく Repository CMS の実装構造を簡潔にまとめる。
+
+仕様・設計・実装は同一バージョンで管理する。
+
+---
+
+# 2. 実装方針
+
+- PHP 8.4以降で実装する
+- 外部依存は追加しない
+- HTTPエントリーポイントは `Core/app.php` のみとする
+- CMS本体コードは `Core/App/` に集約する
+- 単一管理者の認証・認可をCoreで管理する
+- 保持データは `Core/Data/` に保存する
+- 作業データは `Work/` に保存し、保全確認後に削除する
+- ローカルGitリポジトリは保持しない
+- Git操作はGitプロバイダーAPIを通じて行う
+
+---
+
+# 3. ディレクトリ構成
+
+```text
+Core/
+  app.php
+  .htaccess
+  App/
+  Data/
+  Config/
+Modules/
+Work/
+Docs/
+```
+
+`public_html/` は採用しない。
+
+`Core/app.php` 以外への直接HTTPアクセスは禁止する。
+
+---
+
+# 4. 起動構造
+
+```text
+Core/app.php
+  ↓
+Core/App/Bootstrap.php
+  ↓
+Core/App/Runtime.php
+  ↓
+Core/App/App.php
+```
+
+`Core/app.php` は唯一のHTTP制御点である。
+
+---
+
+# 5. Core構成
+
+Core更新領域は以下とする。
+
+- `Core/app.php`
+- `Core/.htaccess`
+- `Core/App/`
+
+`Core/App/` は以下の15 PHPファイルで構成する。
+
+| ファイル | 責務 |
+| --- | --- |
+| `App.php` | HTTPリクエスト制御、画面遷移、操作呼び出し |
+| `Auth.php` | 単一管理者認証、セッション管理 |
+| `Bootstrap.php` | 起動処理、オートロード |
+| `Config.php` | バージョン、環境変数設定 |
+| `ContentManager.php` | コンテンツ取得、保存、履歴、復元 |
+| `GitHubProvider.php` | GitHub API連携 |
+| `GitProvider.php` | Gitプロバイダーインターフェース |
+| `LockManager.php` | CMSロック状態管理 |
+| `NullGitProvider.php` | Git未設定時の安全側実装 |
+| `Renderer.php` | プレビュー、Markdown簡易変換 |
+| `Response.php` | HTMLレスポンス、リダイレクト、エスケープ |
+| `Runtime.php` | 実行時依存の生成と共有 |
+| `Security.php` | パス検証、拡張子検証、CSRF、内容検証 |
+| `StaticGenerator.php` | 静的生成、公開成果物生成 |
+| `WorkData.php` | 作業データ作成、チェックサム、削除 |
+
+---
+
+# 6. データ領域
+
+`Core/Data/` は作業データを含まない保持データ領域とする。
+
+主な保存先は以下とする。
+
+- 認証情報: `Core/Data/auth/admin.json`
+- ログイン失敗状態: `Core/Data/auth/login_state.json`
+- CMSロック情報: `Core/Data/locks/cms.lock.json`
+
+`Core/Data/` は開発元アップデート対象外とする。
+
+---
+
+# 7. 作業データ領域
+
+作業データの保存場所は `Work/` とする。
+
+用途は以下とする。
+
+- 一時作業
+- 静的生成
+- キャッシュ
+- ロック
+
+作業データは保全確認後にすべて削除する。
+
+作業データ削除に失敗した場合はCMS全体をロックする。
+
+---
+
+# 8. Gitプロバイダー設計
+
+Gitプロバイダーは `GitProvider` インターフェースで抽象化する。
+
+初期実装は GitHub API を利用する。
+
+必要なリポジトリは以下の3種類とする。
+
+- コンテンツデータリポジトリ
+- パブリックリポジトリ
+- CMSサーバ運用リポジトリ
+
+ローカルで `git clone`、`git pull`、`git push` は行わない。
+
+---
+
+# 9. 環境変数
+
+```text
+REPOSITORY_CMS_GIT_PROVIDER=github
+REPOSITORY_CMS_GITHUB_TOKEN=
+REPOSITORY_CMS_GITHUB_OWNER=
+REPOSITORY_CMS_CONTENT_REPO=
+REPOSITORY_CMS_PUBLIC_REPO=
+REPOSITORY_CMS_OPS_REPO=
+REPOSITORY_CMS_UPDATE_REPO=
+REPOSITORY_CMS_UPDATE_BRANCH=main
+REPOSITORY_CMS_UPDATE_MANIFEST=updates/releases.json
+REPOSITORY_CMS_BRANCH=main
+```
+
+Gitプロバイダー設定が不足する場合、CMSはロック状態になる。
+
+---
+
+# 10. 認証・認可設計
+
+- CMS独自認証
+- 単一管理者
+- フラットファイル管理
+- 認証情報はGit管理しない
+- 認証履歴はCMSサーバ運用リポジトリへ記録する
+
+認証情報は `Core/Data/auth/admin.json` に保存する。
+
+ログイン失敗状態は `Core/Data/auth/login_state.json` に保存する。
+
+パスワード要件は以下とする。
+
+- 12文字以上
+- 英字を含む
+- 数字を含む
+
+ログイン失敗は5回まで記録し、5回以上失敗した場合は15分間ログインを一時ロックする。
+
+ログイン成功時はログイン失敗状態を削除し、セッションIDを再生成する。
+
+セッション有効期限は最終操作から30分とする。
+
+Cookie属性は以下とする。
+
+- `HttpOnly`
+- `SameSite=Strict`
+- HTTPS時のみ `Secure`
+
+操作前に以下の認可確認を行う。
+
+- 未認証状態ではログインと状態確認のみ許可する
+- CMSロック中は状態確認、ログアウト、アップデート状態確認のみ許可する
+- メンテナンスモード中は管理者ログイン、状態確認、アップデート状態確認のみ許可する
+- その他の管理操作は認証済み管理者のみ許可する
+
+---
+
+# 11. コンテンツ設計
+
+許可拡張子は以下のみとする。
+
+- `.md`
+- `.json`
+- `.png`
+- `.svg`
+
+保存前にパス、拡張子、内容を検証する。
+
+JPEG系を含むその他形式は扱わない。
+
+---
+
+# 12. データ保全設計
+
+正式保存は以下の流れで行う。
+
+```text
+入力検証
+  ↓
+Work/へ作業データ作成
+  ↓
+作業データチェックサム確認
+  ↓
+Gitプロバイダーへ保存
+  ↓
+Gitプロバイダーから再取得
+  ↓
+チェックサム一致確認
+  ↓
+Work/の作業データ削除
+```
+
+保全不能、整合性不明、保全状態不明の場合はCMS全体をロックする。
+
+---
+
+# 13. Web編集設計
+
+Web管理画面で提供する機能は以下とする。
+
+- 作成
+- 編集
+- 保存
+- 履歴
+- 復元
+- プレビュー
+- 静的生成
+- 公開
+
+削除機能は提供しない。
+
+---
+
+# 14. 静的生成・公開設計
+
+静的生成はコンテンツデータをもとに `Work/` 上の作業データとして生成する。
+
+生成対象は以下とする。
+
+- `.md` は `.html` に変換する
+- `.json` はそのまま出力対象とする
+- `.png` はそのまま出力対象とする
+- `.svg` はそのまま出力対象とする
+
+公開は生成成果物をパブリックリポジトリへ保存し、再取得後のチェックサム一致を確認する。
+
+---
+
+# 15. アップデート設計
+
+アップデートシステムは `Core/App/` に組み込む。
+
+開発元アップデート対象は以下のみとする。
+
+- `Core/app.php`
+- `Core/.htaccess`
+- `Core/App/`
+
+`Core/Data/`、`Core/Config/`、`Modules/`、`Work/`、`Docs/` はアップデート対象外とする。
+
+アップデートリリース一覧は開発元リポジトリの `updates/releases.json` から取得する。
+
+リリース項目は以下を持つ。
+
+- `version`
+- `target_version`
+- `released_at`
+- `php`
+- `files`
+
+`files` は `path`、`source`、`checksum` を持つ。
+
+適用時はメンテナンスモードへ切り替え、PHPバージョン、対象バージョン、対象パス、チェックサム、`Work/` の保全状態を検証する。
+
+適用成功後はメンテナンス解除待機状態とし、5分後に公開モードへ戻す。
+
+---
+
+# 16. Modules設計
+
+Modulesは開発元公認セカンドパーティー専用とする。
+
+現時点では実装モジュールを持たない。
+
+Modulesは `Core/app.php` 経由でのみ実行される。
+
+ModulesからCoreへの直接アクセスは禁止する。
+
+---
+
+# 17. 将来機能
+
+`Docs/Master_Spec` に将来機能として記載された機能は初期版では実装しない。
+
+将来機能を開発する場合は、先に `Docs/Master_Spec` へ仕様を明記し、承認後に設計・実装する。

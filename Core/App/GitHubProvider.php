@@ -104,6 +104,31 @@ final class GitHubProvider implements GitProvider
         $this->saveToRepository($this->config->opsRepository, $path, $bytes, 'Repository CMS operation log: ' . ($event['type'] ?? 'event'));
     }
 
+    public function listUpdateReleases(): array
+    {
+        if (!$this->config->updateConfigured()) {
+            return [];
+        }
+        $bytes = $this->readUpdateFile($this->config->updateManifestPath);
+        $manifest = json_decode($bytes, true);
+        if (!is_array($manifest) || !isset($manifest['releases']) || !is_array($manifest['releases'])) {
+            throw new \RuntimeException('アップデートリリース一覧が不正です。');
+        }
+        return $manifest['releases'];
+    }
+
+    public function readUpdateFile(string $path): string
+    {
+        if (!$this->config->updateConfigured()) {
+            throw new \RuntimeException('開発元アップデートリポジトリが未設定です。');
+        }
+        if (!Security::validRepositoryPath($path)) {
+            throw new \InvalidArgumentException('アップデートファイルパスが不正です。');
+        }
+        $data = $this->request('GET', '/repos/' . $this->repo($this->config->updateRepository) . '/contents/' . $this->encodePath($path) . '?ref=' . rawurlencode($this->config->updateBranch));
+        return $this->decodeContentResponse($data);
+    }
+
     private function readFromRepository(string $repository, string $path): string
     {
         $this->assertContentPath($path);

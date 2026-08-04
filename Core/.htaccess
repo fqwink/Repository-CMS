@@ -2,9 +2,18 @@ DirectoryIndex app.php
 Options -Indexes
 
 RewriteEngine On
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^ app.php [L]
+
+<Files "app.php">
+    Require all granted
+</Files>
+
+<FilesMatch "^(?!app\.php$).+">
+    Require all denied
+</FilesMatch>
+
+RewriteRule ^app\.php$ - [L]
+RewriteRule ^$ app.php [L]
+RewriteRule . app.php [L]
 
 <FilesMatch "^\.">
     Require all denied
