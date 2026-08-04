@@ -12,10 +12,18 @@ spl_autoload_register(static function (string $class): void {
         return;
     }
 
-    $framework = dirname(__DIR__, 2) . '/ServerSideLogicFramework/ServerSideLogicFramework.php';
-    if (is_file($framework)) {
-        require_once $framework;
+    $frameworkSource = dirname(__DIR__, 2) . '/ServerSideLogicFramework/ServerSideLogicFramework.php';
+    $frameworkCopy = __DIR__ . '/ServerSideLogicFramework.php';
+    if (!is_file($frameworkCopy)) {
+        throw new \RuntimeException('ServerSideLogicFramework本体がCoreへ組み込まれていません。');
     }
+    if (!is_file($frameworkSource)) {
+        throw new \RuntimeException('ServerSideLogicFramework本体正本を確認できません。');
+    }
+    if (!hash_equals(hash_file('sha256', $frameworkSource) ?: '', hash_file('sha256', $frameworkCopy) ?: '')) {
+        throw new \RuntimeException('ServerSideLogicFramework本体が正本と一致しません。');
+    }
+    require_once $frameworkCopy;
 
     if ($class !== 'ServerSideLogicFramework\\ServerSideLogicFrameworkClient') {
         return;
@@ -46,7 +54,7 @@ final class Bootstrap
 
 final class Config
 {
-    public const VERSION = 'v.0.16';
+    public const VERSION = 'v.0.17';
 
     public function __construct(
         public readonly string $provider,
@@ -1032,6 +1040,220 @@ final class NavigationSettings
     }
 }
 
+final class PagesSettings
+{
+    public function __construct(public readonly array $pages)
+    {
+    }
+
+    public static function defaults(): self
+    {
+        return new self([]);
+    }
+
+    public static function read(Runtime $runtime): self
+    {
+        $path = self::path($runtime);
+        if (!is_file($path)) {
+            return self::defaults();
+        }
+        $bytes = file_get_contents($path);
+        if ($bytes === false) {
+            $runtime->serverSideClient->lock('固定ページ設定を読み取れません。');
+            throw new \RuntimeException('固定ページ設定を読み取れません。');
+        }
+        $data = json_decode($bytes, true);
+        if (!is_array($data)) {
+            $runtime->serverSideClient->lock('固定ページ設定JSONが不正です。');
+            throw new \RuntimeException('固定ページ設定JSONが不正です。');
+        }
+        return self::fromArray($runtime, $data);
+    }
+
+    public static function save(Runtime $runtime, array $input): self
+    {
+        $runtime->serverSideClient->ensureUnlocked();
+        $settings = self::fromArray($runtime, $input);
+        $payload = json_encode($settings->toArray() + ['updated_at' => gmdate(DATE_ATOM)], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($payload === false || file_put_contents(self::path($runtime), $payload, LOCK_EX) === false) {
+            $runtime->serverSideClient->lock('固定ページ設定を保存できません。');
+            throw new \RuntimeException('固定ページ設定を保存できません。');
+        }
+        $readBack = file_get_contents(self::path($runtime));
+        if ($readBack === false || !hash_equals(hash('sha256', $payload), hash('sha256', $readBack))) {
+            $runtime->serverSideClient->lock('固定ページ設定の保全確認に失敗しました。');
+            throw new \RuntimeException('固定ページ設定の保全確認に失敗しました。');
+        }
+        $verified = self::read($runtime);
+        if ($verified->toArray() !== $settings->toArray()) {
+            $runtime->serverSideClient->lock('固定ページ設定の整合性確認に失敗しました。');
+            throw new \RuntimeException('固定ページ設定の整合性確認に失敗しました。');
+        }
+        return $verified;
+    }
+
+    public function published(): array
+    {
+        $pages = array_values(array_filter($this->pages, static fn (array $page): bool => $page['published'] === true));
+        usort($pages, static fn (array $a, array $b): int => $a['order'] <=> $b['order']);
+        return $pages;
+    }
+
+    public function toArray(): array
+    {
+        return ['pages' => $this->pages];
+    }
+
+    private static function fromArray(Runtime $runtime, array $data): self
+    {
+        $pages = $data['pages'] ?? [];
+        if (!is_array($pages)) {
+            $runtime->serverSideClient->lock('固定ページ設定の項目が不正です。');
+            throw new \InvalidArgumentException('固定ページ設定の項目が不正です。');
+        }
+        $normalized = [];
+        $seen = [];
+        foreach ($pages as $page) {
+            if (!is_array($page)) {
+                $runtime->serverSideClient->lock('固定ページ設定のページ項目が不正です。');
+                throw new \InvalidArgumentException('固定ページ設定のページ項目が不正です。');
+            }
+            $title = self::stringField($page, 'title');
+            $path = self::stringField($page, 'path');
+            $published = (bool) ($page['published'] ?? false);
+            $order = $page['order'] ?? 0;
+            if ($title === '' && $path === '') {
+                continue;
+            }
+            if (!$runtime->serverSideClient->validContentPath($path) || $runtime->serverSideClient->allowedExtension($path) !== 'md') {
+                throw new \InvalidArgumentException('固定ページパスが不正です。');
+            }
+            if (!is_int($order) && !(is_string($order) && ctype_digit($order))) {
+                throw new \InvalidArgumentException('固定ページ表示順が不正です。');
+            }
+            $order = (int) $order;
+            if ($order < 0) {
+                throw new \InvalidArgumentException('固定ページ表示順が不正です。');
+            }
+            if (isset($seen[$path])) {
+                throw new \InvalidArgumentException('固定ページパスが重複しています。');
+            }
+            $seen[$path] = true;
+            $normalized[] = [
+                'title' => $title === '' ? $path : $title,
+                'path' => $path,
+                'published' => $published,
+                'order' => $order,
+            ];
+        }
+        usort($normalized, static fn (array $a, array $b): int => $a['order'] <=> $b['order']);
+        return new self($normalized);
+    }
+
+    private static function stringField(array $data, string $key): string
+    {
+        $value = $data[$key] ?? '';
+        if (!is_string($value)) {
+            throw new \InvalidArgumentException('固定ページ設定の項目が不正です: ' . $key);
+        }
+        return trim($value);
+    }
+
+    private static function path(Runtime $runtime): string
+    {
+        return $runtime->configRoot . '/pages.json';
+    }
+}
+
+final class ThemeDisplaySettings
+{
+    private const COLOR_SCOPES = ['basic', 'full'];
+
+    public function __construct(
+        public readonly bool $showSiteName,
+        public readonly bool $showNavigation,
+        public readonly bool $showAdSlots,
+        public readonly string $colorScope,
+    ) {
+    }
+
+    public static function defaults(): self
+    {
+        return new self(true, true, true, 'basic');
+    }
+
+    public static function read(Runtime $runtime): self
+    {
+        $path = self::path($runtime);
+        if (!is_file($path)) {
+            return self::defaults();
+        }
+        $bytes = file_get_contents($path);
+        if ($bytes === false) {
+            $runtime->serverSideClient->lock('テーマ表示設定を読み取れません。');
+            throw new \RuntimeException('テーマ表示設定を読み取れません。');
+        }
+        $data = json_decode($bytes, true);
+        if (!is_array($data)) {
+            $runtime->serverSideClient->lock('テーマ表示設定JSONが不正です。');
+            throw new \RuntimeException('テーマ表示設定JSONが不正です。');
+        }
+        return self::fromArray($runtime, $data);
+    }
+
+    public static function save(Runtime $runtime, array $input): self
+    {
+        $runtime->serverSideClient->ensureUnlocked();
+        $settings = self::fromArray($runtime, $input);
+        $payload = json_encode($settings->toArray() + ['updated_at' => gmdate(DATE_ATOM)], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($payload === false || file_put_contents(self::path($runtime), $payload, LOCK_EX) === false) {
+            $runtime->serverSideClient->lock('テーマ表示設定を保存できません。');
+            throw new \RuntimeException('テーマ表示設定を保存できません。');
+        }
+        $readBack = file_get_contents(self::path($runtime));
+        if ($readBack === false || !hash_equals(hash('sha256', $payload), hash('sha256', $readBack))) {
+            $runtime->serverSideClient->lock('テーマ表示設定の保全確認に失敗しました。');
+            throw new \RuntimeException('テーマ表示設定の保全確認に失敗しました。');
+        }
+        $verified = self::read($runtime);
+        if ($verified->toArray() !== $settings->toArray()) {
+            $runtime->serverSideClient->lock('テーマ表示設定の整合性確認に失敗しました。');
+            throw new \RuntimeException('テーマ表示設定の整合性確認に失敗しました。');
+        }
+        return $verified;
+    }
+
+    public function toArray(): array
+    {
+        return [
+            'show_site_name' => $this->showSiteName,
+            'show_navigation' => $this->showNavigation,
+            'show_ad_slots' => $this->showAdSlots,
+            'color_scope' => $this->colorScope,
+        ];
+    }
+
+    private static function fromArray(Runtime $runtime, array $data): self
+    {
+        $colorScope = $data['color_scope'] ?? 'basic';
+        if (!is_string($colorScope) || !in_array($colorScope, self::COLOR_SCOPES, true)) {
+            $runtime->serverSideClient->lock('テーマ表示設定の色トークン適用範囲が不正です。');
+            throw new \InvalidArgumentException('テーマ表示設定の色トークン適用範囲が不正です。');
+        }
+        return new self(
+            (bool) ($data['show_site_name'] ?? false),
+            (bool) ($data['show_navigation'] ?? false),
+            (bool) ($data['show_ad_slots'] ?? false),
+            $colorScope,
+        );
+    }
+
+    private static function path(Runtime $runtime): string
+    {
+        return $runtime->configRoot . '/theme_display.json';
+    }
+}
+
 final class Response
 {
     public static function html(string $title, string $body, Runtime $runtime, int $status = 200): void
@@ -1050,7 +1272,7 @@ final class Response
             $admin = $runtime->serverSideClient->role() === 'admin';
             $nav = '<nav><a href="?">' . self::escape($translator->t('nav.dashboard')) . '</a><a href="?action=new">' . self::escape($translator->t('nav.create')) . '</a><a href="?action=generate">' . self::escape($translator->t('nav.generate')) . '</a>';
             if ($admin) {
-                $nav .= '<a href="?action=publish">' . self::escape($translator->t('nav.publish')) . '</a><a href="?action=site_settings">' . self::escape($translator->t('nav.site_settings')) . '</a><a href="?action=ad_slots">' . self::escape($translator->t('nav.ad_slots')) . '</a><a href="?action=navigation">' . self::escape($translator->t('nav.navigation')) . '</a><a href="?action=themes">' . self::escape($translator->t('nav.themes')) . '</a><a href="?action=updates">' . self::escape($translator->t('nav.updates')) . '</a><a href="?action=users">' . self::escape($translator->t('nav.users')) . '</a>';
+                $nav .= '<a href="?action=publish">' . self::escape($translator->t('nav.publish')) . '</a><a href="?action=site_settings">' . self::escape($translator->t('nav.site_settings')) . '</a><a href="?action=ad_slots">' . self::escape($translator->t('nav.ad_slots')) . '</a><a href="?action=navigation">' . self::escape($translator->t('nav.navigation')) . '</a><a href="?action=pages">' . self::escape($translator->t('nav.pages')) . '</a><a href="?action=theme_display">' . self::escape($translator->t('nav.theme_display')) . '</a><a href="?action=themes">' . self::escape($translator->t('nav.themes')) . '</a><a href="?action=updates">' . self::escape($translator->t('nav.updates')) . '</a><a href="?action=users">' . self::escape($translator->t('nav.users')) . '</a>';
             }
             $nav .= '<a href="?action=logout">' . self::escape($translator->t('nav.logout')) . '</a></nav>';
         }
@@ -1158,12 +1380,14 @@ final class StaticGenerator
         $siteSettings = SiteSettings::read($this->runtime);
         $adSlots = AdSlots::read($this->runtime);
         $navigation = NavigationSettings::read($this->runtime);
+        $pages = PagesSettings::read($this->runtime);
+        $themeDisplay = ThemeDisplaySettings::read($this->runtime);
 
         foreach ($this->runtime->git->listContent() as $item) {
             $sourcePath = (string) ($item['path'] ?? '');
             $report['total']++;
             try {
-                $output = $this->buildOutput($sourcePath, $theme, $siteSettings, $adSlots, $navigation);
+                $output = $this->buildOutput($sourcePath, $theme, $siteSettings, $adSlots, $navigation, $pages, $themeDisplay);
                 $checksum = $this->runtime->serverSideClient->checksum($output['bytes']);
                 $this->validateGeneratedOutput($output['path'], $output['bytes'], $checksum);
                 $workPath = $this->runtime->serverSideClient->writeWorkData(basename($output['path']), $output['bytes']);
@@ -1211,7 +1435,7 @@ final class StaticGenerator
         return $report;
     }
 
-    private function buildOutput(string $path, array $theme, SiteSettings $siteSettings, AdSlots $adSlots, NavigationSettings $navigation): array
+    private function buildOutput(string $path, array $theme, SiteSettings $siteSettings, AdSlots $adSlots, NavigationSettings $navigation, PagesSettings $pages, ThemeDisplaySettings $themeDisplay): array
     {
         if (!$this->runtime->serverSideClient->validContentPath($path)) {
             throw new \InvalidArgumentException('コンテンツパスが不正です。');
@@ -1226,7 +1450,7 @@ final class StaticGenerator
             }
             return [
                 'path' => $target,
-                'bytes' => $this->wrapHtml($path, $this->renderer->markdown($bytes), $theme, $siteSettings, $adSlots, $navigation),
+                'bytes' => $this->wrapHtml($path, $this->renderer->markdown($bytes), $theme, $siteSettings, $adSlots, $navigation, $pages, $themeDisplay),
             ];
         }
         if (in_array($extension, ['json', 'png', 'svg'], true)) {
@@ -1288,7 +1512,7 @@ final class StaticGenerator
         return $theme['name'] === $name;
     }
 
-    private function wrapHtml(string $sourcePath, string $content, array $theme, SiteSettings $siteSettings, AdSlots $adSlots, NavigationSettings $navigation): string
+    private function wrapHtml(string $sourcePath, string $content, array $theme, SiteSettings $siteSettings, AdSlots $adSlots, NavigationSettings $navigation, PagesSettings $pages, ThemeDisplaySettings $themeDisplay): string
     {
         $title = htmlspecialchars($siteSettings->pageTitle($sourcePath), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $description = htmlspecialchars($siteSettings->description(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
@@ -1299,9 +1523,11 @@ final class StaticGenerator
         $secondary = htmlspecialchars($theme['secondary'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $accent = htmlspecialchars($theme['accent'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $themeName = htmlspecialchars($theme['name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-        $navigationHtml = $this->publicNavigationHtml($navigation);
-        $ads = $this->publicAdSlotsHtml($adSlots);
-        return '<!doctype html><html lang="' . $lang . '"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' . $title . '</title><meta name="description" content="' . $description . '">' . $canonical . '<style>:root{--primary:' . $primary . ';--secondary:' . $secondary . ';--accent:' . $accent . ';--ink:#17202a;--surface:#ecf0f1;--border:#e7edf3}body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:#fff}header{border-bottom:4px solid var(--primary);padding:24px;background:var(--surface)}main{max-width:880px;margin:32px auto;padding:0 20px}a{color:var(--secondary)}.theme-mark{color:var(--accent);font-size:13px}.site-nav{display:flex;gap:12px;flex-wrap:wrap;margin-top:16px}.ad-slot{border:1px solid var(--border);border-left:4px solid var(--accent);padding:12px;margin:18px 0;background:#fafcfe}.ad-slot small{display:block;color:#637083;margin-bottom:4px}</style></head><body data-theme="' . $themeName . '"><header><strong>' . $siteName . '</strong><div class="theme-mark">' . $themeName . '</div>' . $navigationHtml . $ads['header'] . '</header><main>' . $ads['before'] . $content . $ads['after'] . '</main><footer>' . $ads['footer'] . '</footer></body></html>';
+        $siteNameHtml = $themeDisplay->showSiteName ? '<strong>' . $siteName . '</strong>' : '';
+        $navigationHtml = $themeDisplay->showNavigation ? $this->publicNavigationHtml($navigation) . $this->publicPagesHtml($pages) : '';
+        $ads = $themeDisplay->showAdSlots ? $this->publicAdSlotsHtml($adSlots) : ['header' => '', 'before' => '', 'after' => '', 'footer' => ''];
+        $fullScopeCss = $themeDisplay->colorScope === 'full' ? 'body{background:linear-gradient(180deg,var(--surface),#fff)}main{border-top:3px solid var(--secondary)}footer{border-top:3px solid var(--accent)}' : '';
+        return '<!doctype html><html lang="' . $lang . '"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' . $title . '</title><meta name="description" content="' . $description . '">' . $canonical . '<style>:root{--primary:' . $primary . ';--secondary:' . $secondary . ';--accent:' . $accent . ';--ink:#17202a;--surface:#ecf0f1;--border:#e7edf3}body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:#fff}header{border-bottom:4px solid var(--primary);padding:24px;background:var(--surface)}main{max-width:880px;margin:32px auto;padding:0 20px}a{color:var(--secondary)}.theme-mark{color:var(--accent);font-size:13px}.site-nav,.page-nav{display:flex;gap:12px;flex-wrap:wrap;margin-top:16px}.page-nav{border-top:1px solid var(--border);padding-top:12px}.ad-slot{border:1px solid var(--border);border-left:4px solid var(--accent);padding:12px;margin:18px 0;background:#fafcfe}.ad-slot small{display:block;color:#637083;margin-bottom:4px}' . $fullScopeCss . '</style></head><body data-theme="' . $themeName . '" data-color-scope="' . htmlspecialchars($themeDisplay->colorScope, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"><header>' . $siteNameHtml . '<div class="theme-mark">' . $themeName . '</div>' . $navigationHtml . $ads['header'] . '</header><main>' . $ads['before'] . $content . $ads['after'] . '</main><footer>' . $ads['footer'] . '</footer></body></html>';
     }
 
     private function publicNavigationHtml(NavigationSettings $navigation): string
@@ -1311,6 +1537,19 @@ final class StaticGenerator
             $links .= '<a href="' . htmlspecialchars($item['url'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">' . htmlspecialchars($item['label'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</a>';
         }
         return $links === '' ? '' : '<nav class="site-nav">' . $links . '</nav>';
+    }
+
+    private function publicPagesHtml(PagesSettings $pages): string
+    {
+        $links = '';
+        foreach ($pages->published() as $page) {
+            $href = preg_replace('/\.md$/', '.html', $page['path']);
+            if (!is_string($href) || $href === '') {
+                continue;
+            }
+            $links .= '<a href="' . htmlspecialchars($href, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">' . htmlspecialchars($page['title'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</a>';
+        }
+        return $links === '' ? '' : '<nav class="page-nav">' . $links . '</nav>';
     }
 
     private function publicAdSlotsHtml(AdSlots $adSlots): array
@@ -1350,13 +1589,22 @@ final class StaticGenerator
                 $this->runtime->serverSideClient->lock('HTML生成結果のサイト基本設定反映が不正です。');
                 throw new \RuntimeException('HTML生成結果のサイト基本設定反映が不正です。');
             }
-            if (!str_contains($bytes, '<nav class="site-nav"') && count(NavigationSettings::read($this->runtime)->enabled()) > 0) {
+            $themeDisplay = ThemeDisplaySettings::read($this->runtime);
+            if ($themeDisplay->showNavigation && !str_contains($bytes, '<nav class="site-nav"') && count(NavigationSettings::read($this->runtime)->enabled()) > 0) {
                 $this->runtime->serverSideClient->lock('HTML生成結果のナビゲーション反映が不正です。');
                 throw new \RuntimeException('HTML生成結果のナビゲーション反映が不正です。');
             }
-            if (!str_contains($bytes, 'data-ad-slot=') && count(AdSlots::read($this->runtime)->enabled()) > 0) {
+            if ($themeDisplay->showNavigation && !str_contains($bytes, '<nav class="page-nav"') && count(PagesSettings::read($this->runtime)->published()) > 0) {
+                $this->runtime->serverSideClient->lock('HTML生成結果の固定ページ反映が不正です。');
+                throw new \RuntimeException('HTML生成結果の固定ページ反映が不正です。');
+            }
+            if ($themeDisplay->showAdSlots && !str_contains($bytes, 'data-ad-slot=') && count(AdSlots::read($this->runtime)->enabled()) > 0) {
                 $this->runtime->serverSideClient->lock('HTML生成結果の広告配信枠反映が不正です。');
                 throw new \RuntimeException('HTML生成結果の広告配信枠反映が不正です。');
+            }
+            if (!str_contains($bytes, 'data-color-scope="' . $themeDisplay->colorScope . '"')) {
+                $this->runtime->serverSideClient->lock('HTML生成結果のテーマ表示設定反映が不正です。');
+                throw new \RuntimeException('HTML生成結果のテーマ表示設定反映が不正です。');
             }
             return;
         }
@@ -1438,6 +1686,10 @@ final class App
                 'ad_slots_save' => $this->saveAdSlots(),
                 'navigation' => $this->navigation(),
                 'navigation_save' => $this->saveNavigation(),
+                'pages' => $this->pages(),
+                'pages_save' => $this->savePages(),
+                'theme_display' => $this->themeDisplay(),
+                'theme_display_save' => $this->saveThemeDisplay(),
                 'themes' => $this->themes(),
                 'theme_save' => $this->saveTheme(),
                 'updates' => $this->updates(),
@@ -1573,6 +1825,8 @@ final class App
             ['サイト基本設定', '?action=site_settings', 'サイト名、公開URL、言語、メタ情報を管理します。', !$locked && $admin],
             ['広告配信枠', '?action=ad_slots', '広告枠ID、表示位置、表示状態、広告内容を管理します。', !$locked && $admin],
             ['ナビゲーション', '?action=navigation', 'メニュー項目、表示順、リンク先を管理します。', !$locked && $admin],
+            ['固定ページ', '?action=pages', '固定ページのタイトル、パス、公開状態、表示順を管理します。', !$locked && $admin],
+            ['テーマ表示設定', '?action=theme_display', 'サイト名、ナビゲーション、広告枠、色トークン適用範囲を管理します。', !$locked && $admin],
             ['テーマ', '?action=themes', '静的生成で使用するテーマを選択します。', !$locked && $admin],
             ['アップデート', '?action=updates', '開発元リリースを確認します。', $admin],
             ['ユーザー', '?action=users', '管理者と編集担当を管理します。', !$locked && $admin && $initialDone],
@@ -1815,6 +2069,60 @@ final class App
         $settings = NavigationSettings::save($this->runtime, ['items' => $items]);
         $this->audit('navigation.save', ['count' => count($settings->items), 'user' => $this->runtime->serverSideClient->user()]);
         Response::redirect('?action=navigation');
+    }
+
+    private function pages(): void
+    {
+        $pages = PagesSettings::read($this->runtime)->pages;
+        while (count($pages) < 5) {
+            $pages[] = ['title' => '', 'path' => '', 'published' => false, 'order' => count($pages)];
+        }
+        $rows = '';
+        foreach (array_values($pages) as $index => $page) {
+            $rows .= '<div class="settings-row nav-row"><label><input type="checkbox" name="pages[' . $index . '][published]" value="1"' . ($page['published'] ? ' checked' : '') . '> 公開</label><div><label>タイトル</label><input name="pages[' . $index . '][title]" value="' . Response::escape((string) $page['title']) . '"></div><div><label>パス</label><input name="pages[' . $index . '][path]" value="' . Response::escape((string) $page['path']) . '" placeholder="pages/index.md"></div><div><label>表示順</label><input name="pages[' . $index . '][order]" value="' . Response::escape((string) $page['order']) . '" inputmode="numeric"></div></div>';
+        }
+        $body = '<section class="panel"><h2>固定ページ管理</h2><p class="muted">固定ページのタイトル、パス、公開状態、表示順を管理します。削除は行わず、未使用ページは公開を無効にします。</p><form method="post" action="?action=pages_save"><input type="hidden" name="csrf" value="' . $this->runtime->serverSideClient->csrfToken() . '">' . $rows . '<p><button>保存</button></p></form></section>';
+        Response::html('固定ページ管理', $body, $this->runtime);
+    }
+
+    private function savePages(): void
+    {
+        if ($this->requestMethod() !== 'POST') {
+            Response::redirect('?action=pages');
+        }
+        $this->runtime->serverSideClient->requireCsrf();
+        $pages = $_POST['pages'] ?? [];
+        if (!is_array($pages)) {
+            throw new \InvalidArgumentException('固定ページ設定の送信内容が不正です。');
+        }
+        $settings = PagesSettings::save($this->runtime, ['pages' => $pages]);
+        $this->audit('pages.save', ['count' => count($settings->pages), 'user' => $this->runtime->serverSideClient->user()]);
+        Response::redirect('?action=pages');
+    }
+
+    private function themeDisplay(): void
+    {
+        $settings = ThemeDisplaySettings::read($this->runtime);
+        $basicSelected = $settings->colorScope === 'basic' ? ' selected' : '';
+        $fullSelected = $settings->colorScope === 'full' ? ' selected' : '';
+        $body = '<section class="panel"><h2>テーマ表示設定</h2><p class="muted">公開テーマの表示項目と色トークン適用範囲を管理します。</p><form method="post" action="?action=theme_display_save"><input type="hidden" name="csrf" value="' . $this->runtime->serverSideClient->csrfToken() . '"><label><input type="checkbox" name="show_site_name" value="1"' . ($settings->showSiteName ? ' checked' : '') . '> サイト名を表示</label><label><input type="checkbox" name="show_navigation" value="1"' . ($settings->showNavigation ? ' checked' : '') . '> ナビゲーションを表示</label><label><input type="checkbox" name="show_ad_slots" value="1"' . ($settings->showAdSlots ? ' checked' : '') . '> 広告枠を表示</label><label>色トークン適用範囲</label><select name="color_scope"><option value="basic"' . $basicSelected . '>basic</option><option value="full"' . $fullSelected . '>full</option></select><p><button>保存</button></p></form></section>';
+        Response::html('テーマ表示設定', $body, $this->runtime);
+    }
+
+    private function saveThemeDisplay(): void
+    {
+        if ($this->requestMethod() !== 'POST') {
+            Response::redirect('?action=theme_display');
+        }
+        $this->runtime->serverSideClient->requireCsrf();
+        $settings = ThemeDisplaySettings::save($this->runtime, [
+            'show_site_name' => isset($_POST['show_site_name']),
+            'show_navigation' => isset($_POST['show_navigation']),
+            'show_ad_slots' => isset($_POST['show_ad_slots']),
+            'color_scope' => (string) ($_POST['color_scope'] ?? 'basic'),
+        ]);
+        $this->audit('theme_display.save', ['color_scope' => $settings->colorScope, 'user' => $this->runtime->serverSideClient->user()]);
+        Response::redirect('?action=theme_display');
     }
 
     private function saveTheme(): void

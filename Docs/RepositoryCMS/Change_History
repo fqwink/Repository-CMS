@@ -4,6 +4,30 @@
 
 ---
 
+## v.0.38
+
+- CMS Coreを開発集約と実行集約の両方を持つ領域とし、Runtime不要、Core直下直接集約方針を追加。
+- ServerSideLogicFramework本体、Client、各コンポーネント生成物をCoreへ自動集約し、テスト、release-check、リリース、アップデート基準をCoreへ統一。
+- AGENTS、Repository CMS設計、ServerSideLogicFramework設計のCore中心開発前提を整理。
+
+---
+
+## v.0.37
+
+- マスター仕様とRepository CMS設計をv.0.18へ更新し、SQLite運用DB、Core最大7ファイル原則、特定目的型モジュラーコンポーネント機構を追加。
+- StaticGenerator、EditorSystem、AdminFrontendの個別管理候補と、TypeScript正本を配布物に含めないリリース方針を整理。
+- アップデート対象をCore更新領域と承認済みコンポーネント実行用生成物に分離し、保護対象と禁止同梱物を明確化。
+
+---
+
+## v.0.36
+
+- 実装バージョンをv.0.17へ更新し、固定ページ管理とテーマ表示設定を追加。
+- `Core/Config/pages.json` と `Core/Config/theme_display.json` の保全保存、管理者専用UI、静的生成HTML基本反映を追加。
+- release-checkへ固定ページ、テーマ表示設定、v.0.17描画、静的生成反映検証を追加し、release-check-okを確認。
+
+---
+
 ## v.0.35
 
 - 実装バージョンをv.0.16へ更新し、広告配信枠管理とナビゲーション管理を追加。
@@ -87,7 +111,7 @@
 
 - CMS構成を最小化し、Core/AppとModulesを廃止方針へ変更。
 - CMS本体をCore/app.php、Framework ClientコピーをCore/ServerSideLogicFrameworkClient.phpへ整理。
-- RepositoryCMS直下2フォルダ、Core直下3フォルダ、実行用PHP最大2ファイル原則を仕様・設計へ反映。
+- RepositoryCMS本体の最小フォルダ原則と実行用PHP最大2ファイル原則を仕様・設計へ反映。
 
 ---
 

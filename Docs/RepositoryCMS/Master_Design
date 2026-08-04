@@ -2,15 +2,15 @@
 
 # マスター設計書
 
-**Version:** v.0.16
+**Version:** v.0.18
 
 ---
 
 # 1. 設計目的
 
-本設計書は、`Docs/Project_Charter` v.0.16 に基づく Repository CMS の実装構造を簡潔にまとめる。
+本設計書は、`Docs/Project_Charter` v.0.18 に基づく Repository CMS の実装構造を簡潔にまとめる。
 
-現時点の実装バージョンは `RepositoryCMS/Core/app.php` 内で管理する `v.0.16` とする。
+v.0.18実装時は、`RepositoryCMS/Core/app.php` 内で管理する実装バージョンを `v.0.18` とする。
 
 仕様・設計・実装は同一バージョンで管理する。
 
@@ -19,10 +19,16 @@
 # 2. 実装方針
 
 - PHP 8.4以降で実装する
-- 外部依存は追加しない
+- 外部ライブラリは極力使用しない
 - HTTPエントリーポイントは `RepositoryCMS/Core/app.php` のみとする
-- CMS本体コードは `RepositoryCMS/Core/app.php` へ最小集約する
+- CMS Coreは開発集約と実行集約の両方を持つ
+- 特定目的型責務以外のCMS開発は `RepositoryCMS/Core/` の開発集約で管理する
+- `RepositoryCMS/Core/` の実行集約は実行、テスト、リリース、アップデート用の集約を扱う
+- `RepositoryCMS/Core/` 直下ファイル数は最大7ファイルを固定原則とする
 - ServerSideLogicFramework連携は `RepositoryCMS/Core/ServerSideLogicFrameworkClient.php` 経由のみとする
+- TypeScript/JavaScript製移行は特定目的型モジュラーコンポーネント単位で進める
+- TypeScriptソース正本は開発管理用とし、リリース配布物には含めない
+- テスト、release-check、リリース、アップデートはCMS Core実行集約済み実行物を基準にする
 - 管理者1人、編集担当2人の認証・認可はServerSideLogicFrameworkへ委譲する
 - 管理画面は `Docs/Brand_Color_Spec` に基づくブランドカラーを固定で使用する
 - 標準テーマ3個を `RepositoryCMS/Core/Themes/` の開発元管理ソースとして管理する
@@ -31,6 +37,8 @@
 - サイト基本設定は `RepositoryCMS/Core/Config/site.json` に保存する
 - 広告配信枠設定は `RepositoryCMS/Core/Config/ad_slots.json` に保存する
 - ナビゲーション設定は `RepositoryCMS/Core/Config/navigation.json` に保存する
+- 固定ページ設定は `RepositoryCMS/Core/Config/pages.json` に保存する
+- テーマ表示設定は `RepositoryCMS/Core/Config/theme_display.json` に保存する
 - 作業データは `RepositoryCMS/Work/` に保存し、保全確認後に削除する
 - ローカルGitリポジトリは保持しない
 - Git操作はGitプロバイダーAPIを通じて行う
@@ -56,6 +64,7 @@ RepositoryCMS/
   Core/
     app.php
     .htaccess
+    ServerSideLogicFramework.php
     ServerSideLogicFrameworkClient.php
     Config/
     Lang/
@@ -65,17 +74,25 @@ RepositoryCMS/
 ServerSideLogicFramework/
   ServerSideLogicFramework.php
   ServerSideLogicFrameworkClient.php
+
+StaticGenerator/
+
+EditorSystem/
+
+AdminFrontend/
 ```
 
 `public_html/` は採用しない。
 
-リポジトリルート直下は `Docs/`、`RepositoryCMS/`、`ServerSideLogicFramework/` の3系統を基本とする。
+リポジトリルート直下は `Docs/`、`RepositoryCMS/`、`ServerSideLogicFramework/`、特定目的型モジュラーコンポーネントを基本系統とする。
 
 `Docs/` は全体ドキュメント領域であり、CMS本体カウント対象外とする。
 
-Repository CMS本体は `RepositoryCMS/` で管理し、CMS本体カウント対象フォルダは `RepositoryCMS/Core/` と `RepositoryCMS/Work/` の最大2フォルダとする。
+Repository CMS本体は `RepositoryCMS/` で管理し、CMS本体カウント対象フォルダは `RepositoryCMS/Core/`、`RepositoryCMS/Work/` の最大2フォルダとする。
 
 `ServerSideLogicFramework/` はRepository CMS本体とは別責務の並行開発領域とし、Repository CMS本体カウント対象外とする。
+
+特定目的型モジュラーコンポーネントはRepository CMS本体とは別責務の個別管理領域とし、Repository CMS本体カウント対象外とする。
 
 `RepositoryCMS/Core/` 直下フォルダは最大3フォルダとし、現行方針では `Config/`、`Lang/`、`Themes/` の3フォルダとする。
 
@@ -99,7 +116,9 @@ Repository CMS本体は `RepositoryCMS/` で管理し、CMS本体カウント対
 
 CMS側コピーは `RepositoryCMS/Core/ServerSideLogicFrameworkClient.php` とする。
 
-Repository CMSは、CMS側コピーが未配置、破損、改変、不一致、互換性不一致、出所不明、署名不一致、チェックサム不一致の場合、起動および動作しない。
+Framework本体のCMS側コピーは `RepositoryCMS/Core/ServerSideLogicFramework.php` とする。
+
+Repository CMSは、Framework本体コピーまたはClientコピーが未配置、破損、改変、不一致、互換性不一致、出所不明、署名不一致、チェックサム不一致の場合、起動および動作しない。
 
 Repository CMSは、ServerSideLogicFramework本体および内部クラスを直接呼び出さない。
 
@@ -112,7 +131,7 @@ RepositoryCMS/Core/app.php
   ↓
 RepositoryCMS/Core/ServerSideLogicFrameworkClient.php
   ↓ internal API
-ServerSideLogicFramework/ServerSideLogicFramework.php
+RepositoryCMS/Core/ServerSideLogicFramework.php
 ```
 
 ---
@@ -135,16 +154,69 @@ Core更新領域は以下とする。
 
 開発元公認セカンドパーティーモジュール計画は将来的な復帰可能性を残すが、復帰時は先にマスター仕様へ復帰方針、責務境界、配置、権限、アップデート対象可否を明記し、承認後に設計・実装する。
 
-CMS実行用PHPファイルは以下の最大2ファイルとする。
+CMS実行用PHPファイルは以下の最大3ファイルとする。
 
 | ファイル | 責務 |
 | --- | --- |
 | `RepositoryCMS/Core/app.php` | HTTP入口、CMS本体制御、管理画面、コンテンツ管理、静的生成、Gitプロバイダー連携、公開制御 |
+| `RepositoryCMS/Core/ServerSideLogicFramework.php` | ServerSideLogicFramework本体正本コピー |
 | `RepositoryCMS/Core/ServerSideLogicFrameworkClient.php` | ServerSideLogicFrameworkクライアントツール正本コピー |
 
 `.htaccess` はHTTPアクセス制御ファイルであり、CMS実行用PHPファイル数に含めない。
 
+`RepositoryCMS/Core/` 直下ファイル数は最大7ファイルとする。
+
 `release-check.sh` などの開発・リリース確認用ファイルは、実行用PHPファイル数に含めない。
+
+---
+
+# 5.0. CMS Core開発集約と実行集約設計
+
+CMS Coreは、開発集約と実行集約の両方を持つ領域である。
+
+`RepositoryCMS/Core/` の開発集約は、特定目的型責務以外のRepository CMS開発を扱う。
+
+`RepositoryCMS/Core/` の実行集約は、実行、テスト、リリース、アップデート用の集約を扱う。
+
+`RepositoryCMS/Core/` には、CMS Core開発集約対象と、`ServerSideLogicFramework/`、`StaticGenerator/`、`EditorSystem/`、`AdminFrontend/` の特定目的型責務からコピーまたは生成された実行物のみを配置する。
+
+Core側コピーは、対応する開発正本または配布用生成物正本と一致する場合のみ有効とする。
+
+Core側コピーが正本と不一致、正本不明、生成元不明、チェックサム不一致の場合は、起動不可またはリリース不可とする。
+
+`RepositoryCMS/Core/` に特定目的型責務の開発用ソース、TypeScript正本、ビルド設定、テスト専用ファイルを配置しない。
+
+テスト、release-check、GitHubリリース配布物、アップデートは `RepositoryCMS/Core/` に集約済みの実行物を基準にする。
+
+---
+
+# 5.1. 特定目的型モジュラーコンポーネント設計
+
+特定目的型モジュラーコンポーネントは、CMS Coreの軽量性、シンプルさ、長期保守性を維持するための個別管理単位とする。
+
+各コンポーネントは、ServerSideLogicFrameworkと同様に、明確な単一目的責務を持つ。
+
+各コンポーネントはリポジトリルート直下の個別フォルダで管理する。
+
+初期分離候補は以下とする。
+
+| コンポーネント | 責務 | 実装方針 |
+| --- | --- | --- |
+| `StaticGenerator/` | 静的生成ジェネレーターシステム | 完全TypeScript/JavaScript製 |
+| `EditorSystem/` | 本文編集、入力補助、将来WYSIWYG化 | 完全TypeScript/JavaScript製 |
+| `AdminFrontend/` | 管理画面フロント補助、UI操作、プレビュー、フォーム補助 | TypeScript/JavaScript製 |
+
+TypeScriptソースコードは各コンポーネントの開発用正本として管理する。
+
+各コンポーネントは開発正本領域内に配布用生成物正本を保持できる。
+
+配布用生成物正本が存在する場合は、開発時からCMS Coreへ自動コピーして直接実行集約する。
+
+リリース配布物にはTypeScript正本を含めず、Coreへ集約済みのJavaScript生成物、実行用正本コピー、実行時メタ情報、チェックサム、マニフェスト定義のみを含める。
+
+各コンポーネントの実行用生成物のCore集約先、マニフェストパス、検証項目は、コンポーネントごとの設計確定時に定義する。
+
+コンポーネントはCMS Coreのファイル数制限を回避するための無制限な拡張領域ではなく、承認済み責務を個別管理するための構造とする。
 
 ---
 
@@ -163,14 +235,27 @@ CMS実行用PHPファイルは以下の最大2ファイルとする。
 - サイト基本設定: `RepositoryCMS/Core/Config/site.json`
 - 広告配信枠設定: `RepositoryCMS/Core/Config/ad_slots.json`
 - ナビゲーション設定: `RepositoryCMS/Core/Config/navigation.json`
+- 固定ページ設定: `RepositoryCMS/Core/Config/pages.json`
+- テーマ表示設定: `RepositoryCMS/Core/Config/theme_display.json`
+- 運用データベース: `RepositoryCMS/Core/Config/operation.sqlite`
 
 `RepositoryCMS/Core/Config/` の方針は以下とする。
 
 - 直下ファイルのみを配置する
 - サブフォルダを作成しない
 - アップデート時に上書き、削除、初期化しない
-- 認証情報、状態情報、ユーザーテーマ設定、サイト基本設定、広告配信枠設定、ナビゲーション設定を保存する
+- 認証情報、状態情報、ユーザーテーマ設定、サイト基本設定、広告配信枠設定、ナビゲーション設定、固定ページ設定、テーマ表示設定、運用データベースを保存する
 - 作業データを置かない
+
+運用データベースはSQLite単一ファイルとし、`RepositoryCMS/Core/Config/operation.sqlite` を基本配置とする。
+
+運用データベースには、認証情報、ログイン失敗状態、セッション状態、CMSロック状態、メンテナンス状態、アップデート履歴、操作履歴、データ保全確認履歴、保存設定の整合性確認情報、管理画面の運用状態を保存対象とする。
+
+運用データベースには、コンテンツデータ、公開成果物、作業データ、Core本体ソースコード、テーマ関連ソースコード、多言語化データ、リリース配布物、Gitプロバイダー管理履歴を保存しない。
+
+運用データベースは利用者のデータ資産であり、アップデート時に上書き、削除、初期化、移動しない。
+
+運用データベースの読込不能、書込不能、破損、マイグレーション失敗、整合性不一致は保全不能として扱い、CMS全体をロックする。
 
 サイト基本設定は以下の最小項目を持つ。
 
@@ -251,6 +336,56 @@ CMS実行用PHPファイルは以下の最大2ファイルとする。
 ナビゲーション設定の変更は管理者のみ許可し、編集担当は変更できない。
 
 ナビゲーション設定の読込不能、JSON破損、不正値、保存後再読込不一致、チェックサム不一致は保全不能として扱い、保存または生成を止める。
+
+固定ページ設定は以下の最小項目を持つ。
+
+```json
+{
+  "pages": [
+    {
+      "title": "",
+      "path": "",
+      "published": false,
+      "order": 0
+    }
+  ]
+}
+```
+
+固定ページパスは `.md` のみ許可する。
+
+固定ページのタイトルとパスは文字列として扱い、HTML出力時にエスケープする。
+
+表示順は0以上の整数のみ許可する。
+
+固定ページ設定は利用者が管理する設定情報であり、アップデート時に上書き、削除、初期化しない。
+
+固定ページ設定の変更は管理者のみ許可し、編集担当は変更できない。
+
+固定ページ削除機能は提供せず、非公開化は `published` を `false` にすることで扱う。
+
+固定ページ設定の読込不能、JSON破損、不正値、保存後再読込不一致、チェックサム不一致は保全不能として扱い、保存または生成を止める。
+
+テーマ表示設定は以下の最小項目を持つ。
+
+```json
+{
+  "show_site_name": true,
+  "show_navigation": true,
+  "show_ad_slots": true,
+  "color_scope": "basic"
+}
+```
+
+`color_scope` は `basic` または `full` のみ許可する。
+
+テーマ表示設定は利用者が管理する設定情報であり、アップデート時に上書き、削除、初期化しない。
+
+テーマ表示設定の変更は管理者のみ許可し、編集担当は変更できない。
+
+テーマソースコードの編集、独自テーマ追加、テーマ削除は行わない。
+
+テーマ表示設定の読込不能、JSON破損、不正値、保存後再読込不一致、チェックサム不一致は保全不能として扱い、保存または生成を止める。
 
 `RepositoryCMS/Core/Lang/` は開発元管理の多言語化データ領域とし、アップデート時に上書きされる。
 
@@ -400,6 +535,8 @@ Web管理画面で提供する機能は以下とする。
 - サイト基本設定
 - 広告配信枠
 - ナビゲーション管理
+- 固定ページ管理
+- テーマ表示設定
 - テーマ管理
 - 作成
 - 編集
@@ -457,43 +594,60 @@ CMSロック中は状態確認画面を優先して表示し、許可されな�
 
 v.0.16の静的生成反映は基本表示までとし、広告の表示制御強化、静的生成時の高度な差し込みはv.0.20以降で扱う。
 
+静的生成HTMLには、公開状態の固定ページ設定を表示順で整列して基本反映する。
+
+静的生成HTMLには、テーマ表示設定を反映し、サイト名、ナビゲーション、広告枠の表示可否を制御する。
+
+`color_scope` が `basic` の場合は主要色、補助色、アクセント色の基本反映に留める。
+
+`color_scope` が `full` の場合はテーマ定義内の色トークンを公開テーマ表示全体へ広く反映する。
+
 ---
 
 # 15. アップデート設計
 
 アップデートシステムは `RepositoryCMS/Core/app.php` とServerSideLogicFramework内部API経由方式に組み込む。
 
-開発元アップデート対象は以下のみとする。
+開発元アップデート対象は、CMS Core実行集約済み実行物に限定する。
+
+CMS Core実行集約済み実行物は以下とする。
 
 - `RepositoryCMS/Core/app.php`
 - `RepositoryCMS/Core/.htaccess`
+- `RepositoryCMS/Core/ServerSideLogicFramework.php`
 - `RepositoryCMS/Core/ServerSideLogicFrameworkClient.php`
 - `RepositoryCMS/Core/Lang/`
 - `RepositoryCMS/Core/Themes/`
 
-アップデートリリースのマニフェストパスはCMSルート相対とし、`Core/app.php`、`Core/.htaccess`、`Core/ServerSideLogicFrameworkClient.php`、`Core/Lang/`、`Core/Themes/` を使う。
+アップデートリリースのマニフェストパスはCMSルート相対とし、`Core/app.php`、`Core/.htaccess`、`Core/ServerSideLogicFramework.php`、`Core/ServerSideLogicFrameworkClient.php`、`Core/Lang/`、`Core/Themes/` を使う。
 
-`RepositoryCMS/Core/Config/`、`RepositoryCMS/Core/App/`、`RepositoryCMS/Core/Data/`、`RepositoryCMS/Modules/`、`RepositoryCMS/Work/`、`Docs/` はアップデート対象外とする。
+特定目的型モジュラーコンポーネント実行用生成物は、CMS Coreへ直接実行集約されたコピーをマニフェスト対象とする。
 
-`RepositoryCMS/Core/Config/` 内の認証情報、ログイン失敗状態、CMSロック状態、CMS状態、ユーザーテーマ設定、サイト基本設定、広告配信枠設定、ナビゲーション設定はアップデート時に上書き、削除、初期化しない。
+`ServerSideLogicFramework/`、`StaticGenerator/`、`EditorSystem/`、`AdminFrontend/`、`RepositoryCMS/Core/Config/`、`RepositoryCMS/Core/App/`、`RepositoryCMS/Core/Data/`、`RepositoryCMS/Modules/`、`RepositoryCMS/Work/`、`Docs/`、特定目的型責務の開発正本、TypeScript正本はアップデート対象外とする。
+
+`RepositoryCMS/Core/Config/` 内の認証情報、ログイン失敗状態、CMSロック状態、CMS状態、ユーザーテーマ設定、サイト基本設定、広告配信枠設定、ナビゲーション設定、固定ページ設定、テーマ表示設定、運用データベースはアップデート時に上書き、削除、初期化しない。
 
 アップデートリリース一覧は開発元リポジトリの `updates/releases.json` から取得する。
 
-GitHubリリース配布物には、実行、配布、検証に必要なファイルをすべて同梱する。
+GitHubリリース配布物には、Coreへ集約済みの実行、配布、検証に必要なファイルをすべて同梱する。
 
-配布物には `ServerSideLogicFramework/ServerSideLogicFramework.php` 本体を含める。
+配布物には `RepositoryCMS/Core/ServerSideLogicFramework.php` をCMS Core実行集約済みFramework本体コピーとして含める。
 
 配布物には `RepositoryCMS/Core/ServerSideLogicFrameworkClient.php` をCore組み込み済みクライアントとして含める。
 
-配布物には `ServerSideLogicFramework/ServerSideLogicFrameworkClient.php` 正本を含めない。
+配布物には `ServerSideLogicFramework/ServerSideLogicFramework.php` 本体正本と `ServerSideLogicFramework/ServerSideLogicFrameworkClient.php` 正本を含めない。
 
-TypeScriptソースコードは配布物に含めず、TypeScript/JavaScript製移行後はレンタルサーバで実行可能なJavaScript生成物のみを含める。
+特定目的型モジュラーコンポーネントのTypeScriptソースコード正本は配布物に含めない。
 
-認証情報、トークン、秘密鍵、利用者データ、`RepositoryCMS/Core/Config/`、`RepositoryCMS/Work/`、`Docs/`、作業データ、公開成果物、運用履歴は配布物に含めない。
+TypeScript/JavaScript製移行後は、Coreへ集約済みのレンタルサーバで動作可能なJavaScript生成物、実行用正本コピー、実行時メタ情報、チェックサム、リリースマニフェスト定義のみを含める。
 
-`release-check.sh` は、リリース配布物のパスを `RELEASE_PACKAGE_ROOT` で受け取った場合、必要ファイルの同梱漏れと禁止ファイルの混入を検査する。
+配布物には、開発用設定、ビルド設定、テスト専用ファイル、TypeScript型定義のみの開発用ファイル、Node.js依存物、Deno依存物、外部ライブラリ取得前提のファイルを含めない。
 
-更新ファイルは `RepositoryCMS/Work/` に保存し、チェックサム確認後にCore更新領域へ書き込む。
+認証情報、トークン、秘密鍵、利用者データ、運用データベース、`RepositoryCMS/Core/Config/`、`RepositoryCMS/Work/`、`Docs/`、作業データ、公開成果物、運用履歴は配布物に含めない。
+
+`release-check.sh` は、CMS Core実行集約済み実行物とリリース配布物のパスを `RELEASE_PACKAGE_ROOT` で受け取った場合、必要ファイルの同梱漏れ、特定目的型責務の開発正本混入、TypeScript正本混入、禁止ファイル混入、チェックサム不一致を検査する。
+
+更新ファイルは `RepositoryCMS/Work/` に保存し、チェックサム確認後にCMS Core実行集約済み実行物へ書き込む。
 
 適用成功後はメンテナンス解除待機状態とし、5分後に公開モードへ戻す。
 
@@ -509,6 +663,7 @@ TypeScriptソースコードは配布物に含めず、TypeScript/JavaScript製�
 - release-checkの検証結果
 - 管理画面のログイン画面とダッシュボード描画スモーク
 - ServerSideLogicFrameworkクライアントツール正本コピー一致
+- ServerSideLogicFramework本体正本とCMS Coreコピー一致
 - Framework内部クラス直接呼び出し禁止
 - 認証・認可の操作制限
 - アップデート通知、事前検証、適用、失敗時ロック、5分後復帰待機
@@ -517,14 +672,20 @@ TypeScriptソースコードは配布物に含めず、TypeScript/JavaScript製�
 - `RepositoryCMS/Core/Config/site.json` の保存、再読込、チェックサム一致
 - `RepositoryCMS/Core/Config/ad_slots.json` の保存、再読込、チェックサム一致
 - `RepositoryCMS/Core/Config/navigation.json` の保存、再読込、チェックサム一致
+- `RepositoryCMS/Core/Config/pages.json` の保存、再読込、チェックサム一致
+- `RepositoryCMS/Core/Config/theme_display.json` の保存、再読込、チェックサム一致
+- `RepositoryCMS/Core/Config/operation.sqlite` の保護、整合性確認、アップデート非対象確認
 - `RepositoryCMS/Core/Lang/ja.json` と `RepositoryCMS/Core/Lang/en.json` のJSON構文とキー一致
-- 静的生成HTMLへの `lang`、`title`、`description`、ナビゲーション、広告配信枠の基本反映
+- CMS Core実行集約済み正本コピー、生成物、チェックサム一致
+- 静的生成HTMLへの `lang`、`title`、`description`、ナビゲーション、広告配信枠、固定ページ、テーマ表示設定の基本反映
+- 特定目的型モジュラーコンポーネントのTypeScript正本混入禁止
 - `RepositoryCMS/Core/App/`、`RepositoryCMS/Core/Data/` の廃止状態
 - `RepositoryCMS/Modules/` の計画凍結状態
-- リポジトリルート直下3系統原則
+- リポジトリルート直下の基本系統と特定目的型モジュラーコンポーネント個別管理方針
 - RepositoryCMS直下2フォルダ原則
 - RepositoryCMS/Core直下3フォルダ原則
-- CMS実行用PHPファイル最大2ファイル原則
+- RepositoryCMS/Core直下最大7ファイル原則
+- CMS実行用PHPファイル最大3ファイル原則
 
 不具合が見つかった場合のみ、`Docs/Project_Charter` と本設計書の範囲内で修正する。
 

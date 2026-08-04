@@ -4,6 +4,14 @@
 
 ---
 
+## v.0.17
+
+- Framework本体正本をCMS Coreへ直接実行集約し、RepositoryCMS/Core/ServerSideLogicFramework.phpへ正本コピーとして配置する設計へ変更。
+- Client正本コピーに加え、本体正本コピーの一致確認、改変検出、起動不可条件を追加。
+- CMS Coreの実行集約を、実行、テスト、リリース、アップデート基準に統一する方針へ追従。
+
+---
+
 ## v.0.16
 
 - ルート直下 `Docs/` へドキュメントを集約し、Framework設計と変更履歴を `Docs/ServerSideLogicFramework/` へ移行。

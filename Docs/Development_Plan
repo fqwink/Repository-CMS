@@ -128,11 +128,11 @@
 
 ## v.0.18
 
-- TypeScript/JavaScript製移行を段階的に開始する。
-- CMS管理画面のフロント側補助処理から開始する。
+- CMS Coreを開発集約と実行集約の両方を持つ領域として定義する。
+- CMS固有処理、ServerSideLogicFramework、StaticGenerator、EditorSystem、AdminFrontendを個別正本管理する。
+- 特定目的型責務の開発正本からCoreへ正本コピーまたは生成物を自動集約する方針を定義する。
+- テスト、release-check、リリース、アップデートはCMS Core実行集約済み実行物を基準にする。
 - 移行中のバージョンは新機能、改良機能、移行機能を合計最大5項目まで扱える。
-- Node.js必須化、Deno必須化は行わない。
-- リリース時はレンタルサーバで動作可能なJavaScript生成物を同封する。
 
 ## v.0.19
 

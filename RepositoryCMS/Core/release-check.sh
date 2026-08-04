@@ -46,7 +46,7 @@ if [ -z "${PHP_BIN:-}" ]; then
 fi
 
 echo "== PHP syntax =="
-for file in "$CMS_DIR"/Core/app.php "$CMS_DIR"/Core/ServerSideLogicFrameworkClient.php ServerSideLogicFramework/*.php; do
+for file in "$CMS_DIR"/Core/app.php "$CMS_DIR"/Core/ServerSideLogicFramework.php "$CMS_DIR"/Core/ServerSideLogicFrameworkClient.php ServerSideLogicFramework/*.php; do
   "$PHP_BIN" -l "$file" >/dev/null
 done
 
@@ -59,6 +59,14 @@ if [ "$framework_php_count" -ne 2 ] || [ ! -f ServerSideLogicFramework/ServerSid
 fi
 
 echo "== ServerSideLogicFramework client copy =="
+if [ ! -f "$CMS_DIR/Core/ServerSideLogicFramework.php" ]; then
+  echo "ServerSideLogicFramework body copy is missing from Core." >&2
+  exit 1
+fi
+if ! cmp -s ServerSideLogicFramework/ServerSideLogicFramework.php "$CMS_DIR/Core/ServerSideLogicFramework.php"; then
+  echo "ServerSideLogicFramework body copy differs from source." >&2
+  exit 1
+fi
 if [ ! -f "$CMS_DIR/Core/ServerSideLogicFrameworkClient.php" ]; then
   echo "ServerSideLogicFramework client copy is missing from Core." >&2
   exit 1
@@ -78,8 +86,8 @@ fi
 
 echo "== Core PHP file count =="
 core_php_count=$(find "$CMS_DIR/Core" -maxdepth 1 -name '*.php' | wc -l | tr -d ' ')
-if [ "$core_php_count" -ne 2 ]; then
-  echo "Core PHP file count must be exactly 2: $core_php_count" >&2
+if [ "$core_php_count" -ne 3 ]; then
+  echo "Core PHP file count must be exactly 3: $core_php_count" >&2
   find "$CMS_DIR/Core" -maxdepth 1 -name '*.php' -print >&2
   exit 1
 fi
@@ -139,13 +147,13 @@ if [ -n "${RELEASE_PACKAGE_ROOT:-}" ]; then
   for file in \
     "$CMS_DIR/Core/app.php" \
     "$CMS_DIR/Core/.htaccess" \
+    "$CMS_DIR/Core/ServerSideLogicFramework.php" \
     "$CMS_DIR/Core/ServerSideLogicFrameworkClient.php" \
     "$CMS_DIR/Core/Lang/ja.json" \
     "$CMS_DIR/Core/Lang/en.json" \
     "$CMS_DIR/Core/Themes/standard.json" \
     "$CMS_DIR/Core/Themes/blog.json" \
-    "$CMS_DIR/Core/Themes/media.json" \
-    "ServerSideLogicFramework/ServerSideLogicFramework.php"; do
+    "$CMS_DIR/Core/Themes/media.json"; do
     if [ ! -f "$package_root/$file" ]; then
       echo "Release package is missing required file: $file" >&2
       exit 1
@@ -153,6 +161,7 @@ if [ -n "${RELEASE_PACKAGE_ROOT:-}" ]; then
   done
   for path in \
     "ServerSideLogicFramework/ServerSideLogicFrameworkClient.php" \
+    "ServerSideLogicFramework/ServerSideLogicFramework.php" \
     "$CMS_DIR/Core/Config" \
     "$CMS_DIR/Work" \
     "Docs"; do
@@ -202,9 +211,9 @@ else
   echo "git not found; skipped tracked config check."
 fi
 
-echo "== Future content features not exposed in v0.16 =="
+echo "== Future content features not exposed in v0.17 =="
 if grep -n -E 'blog_post|ブログ投稿' "$CMS_DIR/Core/app.php" AGENTS.md >/dev/null 2>&1; then
-    echo "future content feature code or UI is exposed in v0.16." >&2
+    echo "future content feature code or UI is exposed in v0.17." >&2
   grep -n -E 'blog_post|ブログ投稿' "$CMS_DIR/Core/app.php" AGENTS.md >&2
   exit 1
 fi
@@ -330,7 +339,7 @@ $runtime = render_runtime(sys_get_temp_dir() . '/repository-cms-render-login-' .
 ob_start();
 (new App($runtime))->handle();
 $loginHtml = ob_get_clean();
-if (!is_string($loginHtml) || !str_contains($loginHtml, 'ログイン') || !str_contains($loginHtml, 'v.0.16')) {
+if (!is_string($loginHtml) || !str_contains($loginHtml, 'ログイン') || !str_contains($loginHtml, 'v.0.17')) {
     fwrite(STDERR, "login render failed\n");
     exit(1);
 }
@@ -345,7 +354,7 @@ $runtime->serverSideClient->login('owner', 'Password123456');
 ob_start();
 (new App($runtime))->handle();
 $dashboardHtml = ob_get_clean();
-if (!is_string($dashboardHtml) || !str_contains($dashboardHtml, 'ダッシュボード') || !str_contains($dashboardHtml, 'v.0.16') || !str_contains($dashboardHtml, '広告配信枠') || !str_contains($dashboardHtml, 'ナビゲーション')) {
+if (!is_string($dashboardHtml) || !str_contains($dashboardHtml, 'ダッシュボード') || !str_contains($dashboardHtml, 'v.0.17') || !str_contains($dashboardHtml, '広告配信枠') || !str_contains($dashboardHtml, 'ナビゲーション') || !str_contains($dashboardHtml, '固定ページ') || !str_contains($dashboardHtml, 'テーマ表示設定')) {
     fwrite(STDERR, "dashboard render failed\n");
     exit(1);
 }
@@ -364,8 +373,10 @@ use RepositoryCms\Core\Config;
 use RepositoryCms\Core\GitProvider;
 use RepositoryCms\Core\LanguageManager;
 use RepositoryCms\Core\NavigationSettings;
+use RepositoryCms\Core\PagesSettings;
 use RepositoryCms\Core\Runtime;
 use RepositoryCms\Core\SiteSettings;
+use RepositoryCms\Core\ThemeDisplaySettings;
 use ServerSideLogicFramework\Auth;
 use ServerSideLogicFramework\LockManager;
 use ServerSideLogicFramework\ServerSideLogicFramework;
@@ -397,7 +408,7 @@ copy('RepositoryCMS/Core/Lang/en.json', $base . '/core/Lang/en.json');
 
 LanguageManager::assertLanguageFiles('RepositoryCMS/Core/Lang');
 $translator = new LanguageManager('RepositoryCMS/Core/Lang', 'en');
-if ($translator->t('nav.site_settings') !== 'Site Settings' || $translator->t('nav.ad_slots') !== 'Ad Slots' || $translator->t('nav.navigation') !== 'Navigation') {
+if ($translator->t('nav.site_settings') !== 'Site Settings' || $translator->t('nav.ad_slots') !== 'Ad Slots' || $translator->t('nav.navigation') !== 'Navigation' || $translator->t('nav.pages') !== 'Pages' || $translator->t('nav.theme_display') !== 'Theme Display') {
     fwrite(STDERR, "language translation failed\n");
     exit(1);
 }
@@ -446,6 +457,29 @@ $navigation = NavigationSettings::save($runtime, [
 $readNavigation = NavigationSettings::read($runtime);
 if ($navigation->toArray() !== $readNavigation->toArray() || count($readNavigation->enabled()) !== 2) {
     fwrite(STDERR, "navigation conservation failed\n");
+    exit(1);
+}
+
+$pages = PagesSettings::save($runtime, [
+    'pages' => [
+        ['title' => 'Home', 'path' => 'pages/index.md', 'published' => true, 'order' => '0'],
+    ],
+]);
+$readPages = PagesSettings::read($runtime);
+if ($pages->toArray() !== $readPages->toArray() || count($readPages->published()) !== 1) {
+    fwrite(STDERR, "pages conservation failed\n");
+    exit(1);
+}
+
+$themeDisplay = ThemeDisplaySettings::save($runtime, [
+    'show_site_name' => true,
+    'show_navigation' => true,
+    'show_ad_slots' => true,
+    'color_scope' => 'full',
+]);
+$readThemeDisplay = ThemeDisplaySettings::read($runtime);
+if ($themeDisplay->toArray() !== $readThemeDisplay->toArray() || $readThemeDisplay->colorScope !== 'full') {
+    fwrite(STDERR, "theme display conservation failed\n");
     exit(1);
 }
 
@@ -580,10 +614,12 @@ use RepositoryCms\Core\Config;
 use RepositoryCms\Core\GitProvider;
 use RepositoryCms\Core\AdSlots;
 use RepositoryCms\Core\NavigationSettings;
+use RepositoryCms\Core\PagesSettings;
 use RepositoryCms\Core\Renderer;
 use RepositoryCms\Core\Runtime;
 use RepositoryCms\Core\SiteSettings;
 use RepositoryCms\Core\StaticGenerator;
+use RepositoryCms\Core\ThemeDisplaySettings;
 use ServerSideLogicFramework\Auth;
 use ServerSideLogicFramework\LockManager;
 use ServerSideLogicFramework\ServerSideLogicFramework;
@@ -634,9 +670,20 @@ NavigationSettings::save($runtime, [
         ['label' => 'Home', 'url' => '/', 'order' => 0, 'enabled' => true],
     ],
 ]);
+PagesSettings::save($runtime, [
+    'pages' => [
+        ['title' => 'Home', 'path' => 'pages/index.md', 'order' => 0, 'published' => true],
+    ],
+]);
+ThemeDisplaySettings::save($runtime, [
+    'show_site_name' => true,
+    'show_navigation' => true,
+    'show_ad_slots' => true,
+    'color_scope' => 'full',
+]);
 $report = (new StaticGenerator($runtime, new Renderer($runtime->serverSideClient)))->publishReport();
 $html = $git->public['pages/index.html'] ?? '';
-if (($report['succeeded'] ?? 0) !== 1 || !str_contains($html, '<html lang="en">') || !str_contains($html, '<title>Meta Title</title>') || !str_contains($html, '<meta name="description" content="Meta Description">') || !str_contains($html, '<nav class="site-nav"') || !str_contains($html, 'data-ad-slot="after_main"')) {
+if (($report['succeeded'] ?? 0) !== 1 || !str_contains($html, '<html lang="en">') || !str_contains($html, '<title>Meta Title</title>') || !str_contains($html, '<meta name="description" content="Meta Description">') || !str_contains($html, '<nav class="site-nav"') || !str_contains($html, '<nav class="page-nav"') || !str_contains($html, 'data-color-scope="full"') || !str_contains($html, 'data-ad-slot="after_main"')) {
     fwrite(STDERR, "static site metadata failed\n");
     exit(1);
 }
@@ -660,7 +707,7 @@ use ServerSideLogicFramework\WorkData;
 
 final class ReleaseCheckUpdateGit implements GitProvider
 {
-    public string $updateBytes = '<?php echo "v0.17";';
+    public string $updateBytes = '<?php echo "v0.18";';
     public bool $badBytes = false;
 
     public function configured(): bool { return true; }
@@ -675,7 +722,7 @@ final class ReleaseCheckUpdateGit implements GitProvider
     public function listUpdateReleases(): array
     {
         return [
-            ['version' => 'v.0.17', 'target_version' => 'v.0.16', 'released_at' => '2026-08-04T00:00:00Z', 'php' => '8.4', 'files' => [['path' => 'Core/app.php', 'source' => 'updates/v0.17/Core/app.php', 'checksum' => hash('sha256', $this->updateBytes)]]],
+            ['version' => 'v.0.18', 'target_version' => 'v.0.17', 'released_at' => '2026-08-04T00:00:00Z', 'php' => '8.4', 'files' => [['path' => 'Core/app.php', 'source' => 'updates/v0.18/Core/app.php', 'checksum' => hash('sha256', $this->updateBytes)]]],
             ['version' => 'v.0.13', 'target_version' => 'v.0.12', 'released_at' => '2026-08-04T00:00:00Z', 'php' => '8.4', 'files' => [['path' => 'Core/app.php', 'source' => 'updates/v0.13/Core/app.php', 'checksum' => str_repeat('a', 64)]]],
             ['version' => 'broken'],
         ];
@@ -689,6 +736,7 @@ mkdir($base . '/work', 0700, true);
 mkdir($base . '/core', 0700, true);
 file_put_contents($base . '/work/.gitignore', '');
 file_put_contents($base . '/core/app.php', '<?php echo "old";');
+file_put_contents($base . '/core/ServerSideLogicFramework.php', file_get_contents('ServerSideLogicFramework/ServerSideLogicFramework.php'));
 file_put_contents($base . '/core/ServerSideLogicFrameworkClient.php', file_get_contents('ServerSideLogicFramework/ServerSideLogicFrameworkClient.php'));
 file_put_contents($base . '/config/auth.json', json_encode([
     'users' => [[

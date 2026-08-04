@@ -2,7 +2,7 @@
 
 # マスター設計書
 
-**Version:** v.0.6
+**Version:** v.0.17
 
 ---
 
@@ -40,7 +40,11 @@ ServerSideLogicFrameworkのマスター設計と変更履歴は `Docs/ServerSide
 
 フレームワーク本体およびクライアントツールは、それぞれ単一ファイル原則とする。
 
-Repository CMS本体側には、フレームワーク本体の実装コード実体を残さない。
+フレームワーク本体正本は、Repository CMSのCMS Coreへコピーして直接実行集約する。
+
+Repository CMSのCMS Core開発集約対象には、フレームワーク本体の実装コード実体を残さない。
+
+CMS Coreへ直接実行集約されたフレームワーク本体コピーは実行、テスト、リリース、アップデート用の正本コピーとして扱う。
 
 ---
 
@@ -50,7 +54,7 @@ ServerSideLogicFramework本体およびServerSideLogicFrameworkクライアン�
 
 Repository CMS開発元、開発元公認セカンドパーティーモジュール開発者、エンドユーザーは、ServerSideLogicFramework本体およびクライアントツールを独自に開発、改変、再実装、配布しない。
 
-Repository CMSは、ServerSideLogicFramework開発元が配布する正本クライアントツールをコピーしてCoreへ組み込む場合のみ、ServerSideLogicFrameworkとの連携を許可する。
+Repository CMSは、ServerSideLogicFramework開発元が管理する本体正本と正本クライアントツールをコピーしてCoreへ組み込む場合のみ、ServerSideLogicFrameworkとの連携を許可する。
 
 ---
 
@@ -78,15 +82,22 @@ ServerSideLogicFramework/ServerSideLogicFrameworkClient.php
 
 CMS側コピー:
 RepositoryCMS/Core/ServerSideLogicFrameworkClient.php
+
+本体Coreコピー:
+RepositoryCMS/Core/ServerSideLogicFramework.php
 ```
 
 CMS側コピーは、必ず正本をコピーしてCoreへ組み込む。
 
-Repository CMSは、`RepositoryCMS/Core/ServerSideLogicFrameworkClient.php` が存在しない場合、起動および動作しない。
+Framework本体Coreコピーは、必ず本体正本をCMS Coreへ直接実行集約する。
+
+Repository CMSは、`RepositoryCMS/Core/ServerSideLogicFrameworkClient.php` または `RepositoryCMS/Core/ServerSideLogicFramework.php` が存在しない場合、起動および動作しない。
 
 CMS側コピーの独自作成、独自改変、部分改変、再実装は禁止する。
 
-CMS側コピーが未配置、破損、改変、不一致、互換性不一致、出所不明、署名不一致、チェックサム不一致の場合、Repository CMSは起動および動作しない。
+Framework本体Coreコピーの独自作成、独自改変、部分改変、再実装は禁止する。
+
+CMS側コピーまたはFramework本体Coreコピーが未配置、破損、改変、不一致、互換性不一致、出所不明、署名不一致、チェックサム不一致の場合、Repository CMSは起動および動作しない。
 
 Repository CMSからServerSideLogicFrameworkへのアクセスは、Coreへ組み込まれたServerSideLogicFrameworkクライアントツール経由のみとする。
 
@@ -103,7 +114,7 @@ RepositoryCMS/Core/app.php
   ↓
 RepositoryCMS/Core/ServerSideLogicFrameworkClient.php
   ↓ internal API
-ServerSideLogicFramework/ServerSideLogicFramework.php
+RepositoryCMS/Core/ServerSideLogicFramework.php
 ```
 
 `RepositoryCMS/Core/app.php` はCMSのHTTP入口として残すが、フレームワークとの連携方式としての単一エントリーポイント経由方式は採用しない。
@@ -142,7 +153,7 @@ Framework Client
   Repository CMSへコピーして組み込むクライアントツール責務
 
 CMS Core
-  Repository CMS本体に残す責務
+  Repository CMS Coreの開発集約および実行集約へ接続する責務
 
 Out of Scope
   フレームワーク対象外
@@ -152,7 +163,7 @@ Frameworkには、内部API実行環境で扱うサーバーサイド安全制�
 
 Framework Clientには、CMSから内部APIへ接続するための正本コピー型クライアントツールを分類する。
 
-CMS Coreには、CMS固有の画面、コンテンツ管理、静的生成、Gitプロバイダー連携、テーマ管理、公開制御を分類する。
+CMS Coreには、Coreの開発集約対象、Coreへ集約済みの実行物、Framework本体正本コピー、Framework Client正本コピー、CMS固有の実行物を分類する。
 
 Out of Scopeには、外部APIサーバー化、JSON外部API、REST外部API、fetch前提処理を分類する。
 
@@ -161,9 +172,9 @@ Out of Scopeには、外部APIサーバー化、JSON外部API、REST外部API、
 # 9. 安定版までの設計工程
 
 1. 内部API方式の仕様を確定する
-2. ServerSideLogicFrameworkクライアントツール正本を設計する
-3. CMS側クライアントツール組み込み方式を設計する
-4. 正本コピー一致確認と改変検出を設計する
+2. ServerSideLogicFramework本体正本とクライアントツール正本を設計する
+3. CMS Coreへの本体コピー直接実行集約とクライアントツール組み込み方式を設計する
+4. 本体正本コピー、クライアント正本コピーの一致確認と改変検出を設計する
 5. Framework、Framework Client、CMS Coreを分類する
 6. Repository CMS本体仕様との重複を取り除く
 7. 外部公開API非採用を維持する
@@ -184,7 +195,9 @@ Out of Scopeには、外部APIサーバー化、JSON外部API、REST外部API、
 - 責務境界
 - 内部API経由方式
 - クライアントツール正本コピー必須
+- Framework本体正本コピー必須
 - クライアントツール改変時の起動不可
+- Framework本体コピー改変時の起動不可
 - 既存CMSへの影響
 - 外部公開APIサーバー非採用の維持
-- Repository CMS本体側にフレームワーク本体関係コード実体が残っていないこと
+- Repository CMSのCMS Core開発集約対象にフレームワーク本体関係コード実体が残っていないこと

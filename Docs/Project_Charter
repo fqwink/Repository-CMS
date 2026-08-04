@@ -2,7 +2,7 @@
 
 # プロジェクト憲章
 
-**Version:** v\.0\.16
+**Version:** v\.0\.18
 
 ---
 
@@ -243,6 +243,54 @@ GitプロバイダーまたはGit履歴に保存された作業データも削�
 
 ---
 
+# 9.1\. 運用データベース
+
+コンテンツリポジトリとパブリックリポジトリの方針は変更しない。
+
+コンテンツデータ、公開成果物、作業データは運用データベースに保存しない。
+
+運用に必要な状態管理データのみ、フラットファイル寄りのデータベースとしてSQLiteを採用する。
+
+運用データベースは単一SQLiteファイルとし、保存場所は `RepositoryCMS/Core/Config/operation.sqlite` を基本とする。
+
+外部データベースサーバは必須化しない。
+
+初期方針ではMySQL、MariaDB、PostgreSQL等の外部DBMSを採用しない。
+
+運用データベースは利用者のデータ資産であり、開発元アップデート時に上書き、削除、初期化、移動してはならない。
+
+運用データベースには以下を保存対象とする。
+
+- 認証情報
+- ログイン失敗状態
+- セッション状態
+- CMSロック状態
+- メンテナンス状態
+- アップデート履歴
+- 操作履歴
+- データ保全確認履歴
+- 保存設定の整合性確認情報
+- 管理画面の運用状態
+
+運用データベースには以下を保存してはならない。
+
+- コンテンツデータ
+- 公開成果物
+- 作業データ
+- Core本体ソースコード
+- テーマ関連ソースコード
+- 多言語化データ
+- リリース配布物
+- Gitプロバイダー管理履歴
+
+運用データベースの読み書き失敗、破損、マイグレーション失敗、整合性不一致、保全状態不明を検知した場合はCMS全体をロックする。
+
+運用データベースのマイグレーションは、事前検査、バックアップ、適用、再読込、整合性確認を必須とする。
+
+運用データベースはGit管理対象、開発元アップデート対象、リリース配布物の対象にしない。
+
+---
+
 # 10\. 認証・認可
 
 - CMS独自認証
@@ -403,6 +451,53 @@ v\.0\.16では単一ナビゲーションの基本管理までを対象とする
 
 ---
 
+# 11\.3 固定ページ管理
+
+v\.0\.17では固定ページ管理を改良する。
+
+固定ページは `.md` コンテンツとして扱う。
+
+固定ページ管理では、固定ページ一覧、タイトル、パス、公開状態、表示順を管理する。
+
+固定ページ設定は利用者が管理する設定情報であり、開発元アップデートで上書き、削除、初期化しない。
+
+固定ページ設定は `RepositoryCMS/Core/Config/pages.json` に保存する。
+
+固定ページ設定の変更は管理者のみ許可し、編集担当は変更できない。
+
+固定ページ削除機能は提供しない。
+
+未使用または非公開にする場合は、公開状態を無効にする。
+
+固定ページ設定の読込不能、JSON破損、不正値、保存後再読込不一致、チェックサム不一致は保全不能として扱い、保存または生成を止める。
+
+---
+
+# 11\.4 テーマ表示設定
+
+v\.0\.17ではテーマ表示設定を改良する。
+
+テーマ表示設定では、公開テーマにおける表示項目と色トークン適用範囲を基本制御する。
+
+管理対象は以下とする。
+
+- サイト名表示
+- ナビゲーション表示
+- 広告枠表示
+- 色トークン適用範囲
+
+テーマ表示設定は利用者が管理する設定情報であり、開発元アップデートで上書き、削除、初期化しない。
+
+テーマ表示設定は `RepositoryCMS/Core/Config/theme_display.json` に保存する。
+
+テーマ表示設定の変更は管理者のみ許可し、編集担当は変更できない。
+
+テーマソースコードの編集、独自テーマ追加、テーマ削除は対象外とする。
+
+テーマ表示設定の読込不能、JSON破損、不正値、保存後再読込不一致、チェックサム不一致は保全不能として扱い、保存または生成を止める。
+
+---
+
 # 12\. テンプレート
 
 CMS本体へ内蔵する。
@@ -427,13 +522,19 @@ CMS本体へ内蔵する。
 
 # 14\. 外部依存
 
-原則ゼロ。
+外部ライブラリは極力使用しない。
 
-例外
+標準機能で実現可能な場合は、標準機能を優先する。
 
-Markdownライブラリー
+外部ライブラリを使用する場合は例外扱いとし、必要性、代替不能理由、保守性、セキュリティ、ライセンス、リリース同梱可否を確認する。
 
-将来的に内製化する。
+外部ライブラリ採用は、マスター仕様とマスター設計へ明記し、ユーザー承認後にのみ実装する。
+
+SQLiteはPHP標準拡張または実行環境標準機能として扱い、外部ライブラリ追加とは区別する。
+
+CDN依存、外部API依存、Node.js必須化、Deno必須化は行わない。
+
+Markdownライブラリは例外候補とするが、採用する場合も承認を必須とし、将来的な内製化を検討する。
 
 ---
 
@@ -453,14 +554,18 @@ public\_html/ は採用しない。
   - Core/
     - app\.php
     - \.htaccess
+    - ServerSideLogicFramework\.php
     - ServerSideLogicFrameworkClient\.php
     - Config/
     - Lang/
     - Themes/
   - Work/
 - ServerSideLogicFramework/
+- StaticGenerator/
+- EditorSystem/
+- AdminFrontend/
 
-リポジトリルート直下は Docs/、RepositoryCMS/、ServerSideLogicFramework/ の3系統を基本とする。
+リポジトリルート直下は Docs/、RepositoryCMS/、ServerSideLogicFramework/、特定目的型モジュラーコンポーネントを基本系統とする。
 
 Docs/ は全体ドキュメント領域であり、Repository CMS本体のルート直下フォルダ数制約には含めない。
 
@@ -474,6 +579,8 @@ RepositoryCMS/ 直下のRepository CMS本体カウント対象フォルダは最
 - Work/
 
 ServerSideLogicFramework/ はRepository CMS本体とは別責務の並行開発領域であり、Repository CMS本体のルート直下フォルダ数のカウント対象外とする。
+
+特定目的型モジュラーコンポーネントはRepository CMS本体とは別責務の個別管理領域であり、Repository CMS本体のルート直下フォルダ数のカウント対象外とする。
 
 RepositoryCMS/Work/ はRepositoryCMS本体カウント対象とする。
 
@@ -499,32 +606,63 @@ RepositoryCMS/Core/\.htaccess は RepositoryCMS/Core/app\.php 以外への直接
 
 ---
 
+# 16.1\. CMS Core開発集約と実行集約
+
+CMS Coreは、開発集約と実行集約の両方を持つ領域である。
+
+RepositoryCMS/Core/ の開発集約は、特定目的型責務以外のRepository CMS開発を扱う。
+
+RepositoryCMS/Core/ の実行集約は、実行、テスト、リリース、アップデート用の集約を扱う。
+
+RepositoryCMS/Core/ には、CMS Core開発集約対象と、ServerSideLogicFramework/、StaticGenerator/、EditorSystem/、AdminFrontend/ などの特定目的型責務からコピーまたは生成された実行物を直接配置する。
+
+テスト、release-check、GitHubリリース配布物、アップデートは RepositoryCMS/Core/ に集約済みの実行物を基準にする。
+
+RepositoryCMS/Core/ に特定目的型責務の開発用ソース、TypeScript正本、ビルド設定、テスト専用ファイルを配置してはならない。
+
+Core側コピーが正本と不一致、正本不明、生成元不明、チェックサム不一致の場合は、起動不可またはリリース不可とする。
+
+---
+
 # 17\. Core
 
-Coreは開発元が提供するCMS本体である。
+Coreは開発元が提供するCMS Core開発集約領域および実行集約領域である。
+
+特定目的型責務以外の開発正本はCoreの開発集約で管理する。
 
 Coreは以下で構成する。
 
 - app\.php
 - \.htaccess
+- ServerSideLogicFramework\.php
 - ServerSideLogicFrameworkClient\.php
 - Config/
 - Lang/
 - Themes/
 
-RepositoryCMS/Core/app\.php はCMS本体コード領域とする。
+RepositoryCMS/Core/app\.php はCMS CoreのHTTPエントリーポイント実行物とする。
 
-RepositoryCMS/Core/app\.php はCMS本体コードの単一ファイル原則とする。
+RepositoryCMS/Core/app\.php は特定目的型責務以外のCMS Core開発集約対象とする。
+
+RepositoryCMS/Core/ServerSideLogicFramework\.php はServerSideLogicFramework本体正本コピー領域とする。
 
 RepositoryCMS/Core/ServerSideLogicFrameworkClient\.php はServerSideLogicFrameworkクライアントツール正本コピー領域とする。
 
-Repository CMSの実行に必要なPHPファイルは、RepositoryCMS/Core/app\.php と RepositoryCMS/Core/ServerSideLogicFrameworkClient\.php の最大2ファイルとする。
+RepositoryCMS/Core/Runtime/ は不要とし、作成・維持しない。
+
+ServerSideLogicFramework本体正本コピー、StaticGenerator生成物、EditorSystem生成物、AdminFrontend生成物はCMS Coreへ直接実行集約する。
+
+CMS Coreへ実行集約された実行物は、対応する開発正本または配布用生成物正本と一致する場合のみ有効とする。
+
+Repository CMSの実行に必要なPHPファイルは、RepositoryCMS/Core/app\.php、RepositoryCMS/Core/ServerSideLogicFramework\.php、RepositoryCMS/Core/ServerSideLogicFrameworkClient\.php の最大3ファイルとする。
 
 RepositoryCMS/Core/\.htaccess はHTTPアクセス制御ファイルであり、CMS本体PHPファイル数には含めない。
 
-開発元は RepositoryCMS/Core/app\.php、RepositoryCMS/Core/\.htaccess、RepositoryCMS/Core/ServerSideLogicFrameworkClient\.php、RepositoryCMS/Core/Lang/、RepositoryCMS/Core/Themes/ を変更、修正、更新、改良、バグ修正できる。
+開発元は RepositoryCMS/Core/、ServerSideLogicFramework/、StaticGenerator/、EditorSystem/、AdminFrontend/ の開発正本を変更、修正、更新、改良、バグ修正できる。
 
-エンドユーザーには RepositoryCMS/Core/app\.php、RepositoryCMS/Core/ServerSideLogicFrameworkClient\.php、RepositoryCMS/Core/Lang/、RepositoryCMS/Core/Themes/ の変更、修正、カスタマイズ権限を与えない。
+開発元は特定目的型責務の開発正本から RepositoryCMS/Core/ へコピーまたは生成物集約を行える。
+
+エンドユーザーには RepositoryCMS/Core/app\.php、RepositoryCMS/Core/ServerSideLogicFramework\.php、RepositoryCMS/Core/ServerSideLogicFrameworkClient\.php、RepositoryCMS/Core/Lang/、RepositoryCMS/Core/Themes/ の変更、修正、カスタマイズ権限を与えない。
 
 RepositoryCMS/Core/Lang/ はCMSサーバ等を多言語化するための開発元管理データ領域とする。
 
@@ -552,6 +690,9 @@ RepositoryCMS/Core/Config/ には以下を含める。
 - サイト基本設定
 - 広告配信枠設定
 - ナビゲーション設定
+- 固定ページ設定
+- テーマ表示設定
+- 運用データベース
 
 RepositoryCMS/Core/Config/ はアップデート時に上書き、削除、初期化しない。
 
@@ -565,17 +706,19 @@ RepositoryCMS/Core/Data/ を作成・維持してはならない。
 
 RepositoryCMS/Core/ 直下に作業データ用フォルダを作成・維持してはならない。
 
-RepositoryCMS/Core/Config/、RepositoryCMS/Core/Lang/、RepositoryCMS/Core/Themes/ への直接アクセスは禁止する。
+RepositoryCMS/Core/Config/、RepositoryCMS/Core/ServerSideLogicFramework\.php、RepositoryCMS/Core/ServerSideLogicFrameworkClient\.php、RepositoryCMS/Core/Lang/、RepositoryCMS/Core/Themes/ への直接アクセスは禁止する。
 
-共通利用されるCMS本体機能はすべてRepositoryCMS/Core/app\.phpへ集約する。
+特定目的型責務以外の共通利用されるCMS Core処理はRepositoryCMS/Core/の開発集約で管理する。
 
 CMS本体は最小ファイル原則を採用する。
 
-RepositoryCMS/Core/ の実行用PHPファイル数は最大2ファイルまでとする。
+RepositoryCMS/Core/ 直下のファイル数は最大7ファイルを固定原則とする。
+
+RepositoryCMS/Core/ の実行用PHPファイル数は最大3ファイルまでとする。
 
 2ファイルは上限であり、不要なファイル追加は行わない。
 
-CMS本体機能は原則としてRepositoryCMS/Core/app\.phpへ集約する。
+CMS実行物は原則としてRepositoryCMS/Core/へ集約する。
 
 2ファイルを超える場合は、事前にマスター仕様変更案を提示し、承認を得る。
 
@@ -605,12 +748,18 @@ ServerSideLogicFramework/ のドキュメントは以下で管理する。
 
 ServerSideLogicFrameworkクライアントツール正本は、単一ファイル原則として ServerSideLogicFramework/ServerSideLogicFrameworkClient.php に配置する。
 
+ServerSideLogicFramework本体正本は、CMS Coreへ正本コピーとして実行集約し、RepositoryCMS/Core/ServerSideLogicFramework.php に配置する。
+
+ServerSideLogicFrameworkクライアントツール正本は、RepositoryCMS/Core/ServerSideLogicFrameworkClient.php へ正本コピーとして自動集約する。
+
 ServerSideLogicFramework/ 直下の構成は以下とする。
 
 - ServerSideLogicFramework.php
 - ServerSideLogicFrameworkClient.php
 
-Repository CMS本体側およびServerSideLogicFramework/直下の別PHPファイルには、サーバーサイドロジックフレームワーク関係の実装コード実体を残さない。
+Repository CMSのCMS Core開発集約対象には、サーバーサイドロジックフレームワーク関係の実装コード実体を残さない。
+
+RepositoryCMS/Core/ServerSideLogicFramework.php は、ServerSideLogicFramework本体正本からコピーされた実行用正本コピーのみを配置する。
 
 Repository CMS本体のドキュメントは Docs/RepositoryCMS/ で管理し、Docs/ServerSideLogicFramework/ と混在させない。
 
@@ -624,13 +773,17 @@ ServerSideLogicFramework本体およびServerSideLogicFrameworkクライアン�
 
 Repository CMS開発元、開発元公認セカンドパーティーモジュール開発者、エンドユーザーは、ServerSideLogicFramework本体およびServerSideLogicFrameworkクライアントツールを独自に開発、改変、再実装、配布してはならない。
 
-Repository CMSは、ServerSideLogicFramework開発元が配布する正本クライアントツールをコピーしてCoreへ組み込む場合のみ、ServerSideLogicFrameworkとの連携を許可する。
+Repository CMSは、ServerSideLogicFramework開発元が管理する本体正本およびクライアントツール正本をCoreへコピーして組み込む場合のみ、ServerSideLogicFrameworkとの連携を許可する。
 
 ServerSideLogicFrameworkクライアントツールのCore組み込み先は、RepositoryCMS/Core/ServerSideLogicFrameworkClient.php に固定する。
 
+ServerSideLogicFramework本体のCore組み込み先は、RepositoryCMS/Core/ServerSideLogicFramework.php に固定する。
+
 Repository CMS側に組み込まれたServerSideLogicFrameworkクライアントツールが未配置、破損、改変、不一致、互換性不一致、出所不明、署名不一致、チェックサム不一致の場合、Repository CMSは起動および動作してはならない。
 
-Repository CMSは、ServerSideLogicFrameworkクライアントツールをCoreへ組み込まない場合、起動および動作してはならない。
+Repository CMS側に組み込まれたServerSideLogicFramework本体コピーが未配置、破損、改変、不一致、互換性不一致、出所不明、署名不一致、チェックサム不一致の場合、Repository CMSは起動および動作してはならない。
+
+Repository CMSは、ServerSideLogicFramework本体コピーおよびクライアントツールをCoreへ組み込まない場合、起動および動作してはならない。
 
 ServerSideLogicFrameworkは外部公開APIサーバーとして扱わない。
 
@@ -642,11 +795,13 @@ Repository CMSとServerSideLogicFrameworkのやり取りは、単一エントリ
 
 RepositoryCMS/Core/app.php はCMSのHTTP入口として残すが、ServerSideLogicFrameworkとの連携方式としての単一エントリーポイント経由方式は採用しない。
 
-分離実装では、RepositoryCMS/Core/app.php が Repository CMS本体とCMS側に組み込まれたServerSideLogicFrameworkクライアントツールの読み込みを担当する。
+分離実装では、RepositoryCMS/Core/app.php がCMS Core実行集約済み実行物とCMS側に組み込まれたServerSideLogicFrameworkクライアントツールの読み込みを担当する。
 
 Repository CMS本体は、認証、認可、ログイン要求、CSRF、ロック、アップデート、メンテナンス解除待機判定、HTTPメソッド判定、作業データ保全をクライアントツール経由でサーバーサイドロジックフレームワークへ委譲する。
 
 Repository CMS本体は、サーバーサイドロジックフレームワーク内部クラスへ直接依存せず、RepositoryCMS/Core/ServerSideLogicFrameworkClient.php としてCoreに組み込まれた正本コピーを通じて内部APIを利用する。
+
+Repository CMSの実行時に使用するServerSideLogicFramework本体は、CMS Coreへ実行集約され、RepositoryCMS/Core/ServerSideLogicFramework.php に配置された正本コピーとする。
 
 RepositoryCMS/Core/app.php は、認証、ロック、作業データ保全の実体をCMS本体固有責務として保持しない。
 
@@ -670,9 +825,52 @@ TypeScript/JavaScript製移行は以下を原則とする。
 - Deno必須化はしない
 - 開発時はTypeScriptソースを管理対象にできる
 - リリース時はレンタルサーバで動作可能なJavaScript生成物を同封する
+- TypeScriptソースコードはリリース配布物に含めない
 - PHP側の `RepositoryCMS/Core/app.php` とServerSideLogicFramework連携は当面維持する
 - 認証、認可、CSRF、ロック、アップデート、保全判定はServerSideLogicFramework経由を維持する
-- v\.0\.18ではCMS管理画面のフロント側補助処理から段階移行を開始する
+- v\.0\.18では特定目的型モジュラーコンポーネント機構の導入から段階移行を開始する
+
+---
+
+# 18.1\. 特定目的型モジュラーコンポーネント機構
+
+Repository CMSは、CMS Coreの軽量性、シンプルさ、長期保守性を維持するため、特定目的型モジュラーコンポーネント機構を採用する。
+
+CMS Coreは最大7ファイル原則を固定化し、CMS Coreへ機能実装を過度に集約しない。
+
+特定目的型モジュラーコンポーネントは、ServerSideLogicFrameworkと同様に、明確な単一目的責務を持つ独立管理単位とする。
+
+特定目的型モジュラーコンポーネントは、それぞれリポジトリルート直下に個別フォルダとして配置する。
+
+各コンポーネントは、個別にTypeScriptソースコード正本、設計、生成物、リリース対象を管理する。
+
+各コンポーネントは、開発正本領域内に配布用生成物正本を保持できる。
+
+TypeScript/JavaScript製移行において、完全TypeScript/JavaScript製にする機能は、原則として特定目的型モジュラーコンポーネントとして管理する。
+
+TypeScriptソースコードは開発用正本として管理し、リリース配布物には含めない。
+
+配布用生成物正本が存在する場合は、開発時からCMS Coreへ自動コピーして直接実行集約する。
+
+テスト、release-check、GitHubリリース配布物、アップデートはCoreへ集約済みのコピーを基準にする。
+
+リリース時は、RepositoryCMS/Core/へ集約済みのJavaScript生成物、実行用正本コピー、実行時メタ情報、チェックサム、マニフェスト定義のみを同梱する。
+
+特定目的型モジュラーコンポーネントは、CMS Coreのファイル数制限を回避するための無制限な拡張領域ではなく、承認済み責務を個別管理するための構造とする。
+
+初期分離候補は以下とする。
+
+- StaticGenerator/
+- EditorSystem/
+- AdminFrontend/
+
+StaticGenerator/ は、静的生成ジェネレーターシステムを担当する完全TypeScript/JavaScript製コンポーネント候補とする。
+
+EditorSystem/ は、本文編集、入力補助、将来WYSIWYG化を担当する完全TypeScript/JavaScript製コンポーネント候補とする。
+
+AdminFrontend/ は、管理画面フロント補助、UI操作、プレビュー、フォーム補助を担当するTypeScript/JavaScript製コンポーネント候補とする。
+
+各コンポーネントは、仕様、設計、実装、リリース同梱方針を確定し、承認後に作成、実装する。
 
 ---
 
@@ -696,9 +894,11 @@ RepositoryCMS/Modules/ を作成・維持してはならない。
 
 アップデートシステムは、RepositoryCMS/Core/app.php と ServerSideLogicFramework内部API経由方式に組み込む。
 
-アップデートは開発元が提供するCore更新領域の更新機能である。
+アップデートは開発元が提供するCMS Core実行集約済み実行物の更新機能である。
 
 Core更新領域はアップデート対象に定義する。
+
+特定目的型モジュラーコンポーネントは、仕様、設計、実装、リリース同梱方針が確定したもののみアップデート対象にできる。
 
 開発元リポジトリにアップデートリリースファイルを公開する。
 
@@ -710,19 +910,25 @@ CMSは開発元リポジトリからアップデートリリース情報を取�
 
 # 21\. アップデート対象
 
-開発元アップデート対象は、リポジトリ上では `RepositoryCMS/Core/app.php`、`RepositoryCMS/Core/.htaccess`、`RepositoryCMS/Core/ServerSideLogicFrameworkClient.php`、`RepositoryCMS/Core/Lang/`、`RepositoryCMS/Core/Themes/` のみとする。
+開発元アップデート対象は、CMS Core実行集約済み実行物に限定する。
 
-アップデートリリースのマニフェストパスはCMSルート相対とし、`Core/app.php`、`Core/.htaccess`、`Core/ServerSideLogicFrameworkClient.php`、`Core/Lang/`、`Core/Themes/` を使う。
+CMS Core実行集約済み実行物は、リポジトリ上では `RepositoryCMS/Core/app.php`、`RepositoryCMS/Core/.htaccess`、`RepositoryCMS/Core/ServerSideLogicFramework.php`、`RepositoryCMS/Core/ServerSideLogicFrameworkClient.php`、`RepositoryCMS/Core/Lang/`、`RepositoryCMS/Core/Themes/` のみとする。
 
-開発元は `RepositoryCMS/Core/app.php`、`RepositoryCMS/Core/.htaccess`、`RepositoryCMS/Core/ServerSideLogicFrameworkClient.php`、テーマ関連ソースコード、多言語化データを更新、改良、バグ修正する。
+アップデートリリースのマニフェストパスはCMSルート相対とし、`Core/app.php`、`Core/.htaccess`、`Core/ServerSideLogicFramework.php`、`Core/ServerSideLogicFrameworkClient.php`、`Core/Lang/`、`Core/Themes/` を使う。
 
-開発元アップデートは `RepositoryCMS/Core/Config/`、`RepositoryCMS/Modules/`、`RepositoryCMS/Work/`、`Docs/`、コンテンツデータ、公開成果物、CMSサーバ運用履歴に関与しない。
+特定目的型モジュラーコンポーネント実行用生成物は、CMS Coreへ直接実行集約されたコピーをマニフェスト対象とする。
+
+開発元は特定目的型責務の開発正本を更新、改良、バグ修正し、正本コピーまたは生成物を RepositoryCMS/Core/ へ自動集約する。
+
+開発元アップデートは `ServerSideLogicFramework/`、`StaticGenerator/`、`EditorSystem/`、`AdminFrontend/`、`RepositoryCMS/Core/Config/`、`RepositoryCMS/Modules/`、`RepositoryCMS/Work/`、`Docs/`、コンテンツデータ、公開成果物、CMSサーバ運用履歴、特定目的型責務の開発正本、TypeScript正本に関与しない。
 
 RepositoryCMS/Core/ 内の開発元管理領域の扱いは以下とする。
 
 - RepositoryCMS/Core/Lang/ はアップデート時に上書き可能
 - RepositoryCMS/Core/Themes/ はアップデート時に上書き可能
 - RepositoryCMS/Core/ServerSideLogicFrameworkClient.php は正本コピーとしてアップデート時に上書き可能
+- RepositoryCMS/Core/ServerSideLogicFramework.php はCMS Core実行集約済み実行物としてアップデート時に上書き可能
+- 特定目的型モジュラーコンポーネントのTypeScript正本はアップデート対象外
 - ユーザーによるテーマ関連ソースコードの修正・カスタマイズは禁止
 - 作業データは配置禁止
 
@@ -734,6 +940,9 @@ RepositoryCMS/Core/ 内の開発元管理領域の扱いは以下とする。
 - RepositoryCMS/Core/Data/
 - RepositoryCMS/Work/
 - Docs/
+- StaticGenerator/ のTypeScript正本
+- EditorSystem/ のTypeScript正本
+- AdminFrontend/ のTypeScript正本
 - 認証情報
 - ログイン失敗状態
 - CMSロック状態
@@ -742,13 +951,16 @@ RepositoryCMS/Core/ 内の開発元管理領域の扱いは以下とする。
 - サイト基本設定
 - 広告配信枠設定
 - ナビゲーション設定
+- 固定ページ設定
+- テーマ表示設定
+- 運用データベース
 - コンテンツデータ
 - 公開成果物
 - CMSサーバ運用履歴
 
-アップデートは `Core/app.php`、`Core/.htaccess`、`Core/ServerSideLogicFrameworkClient.php`、`Core/Lang/`、`Core/Themes/` の置換・追加・修正として行う。
+アップデートは `Core/app.php`、`Core/.htaccess`、`Core/ServerSideLogicFramework.php`、`Core/ServerSideLogicFrameworkClient.php`、`Core/Lang/`、`Core/Themes/` の置換・追加・修正として行う。
 
-アップデートによって、`RepositoryCMS/Core/Config/`、`RepositoryCMS/Core/App/`、`RepositoryCMS/Core/Data/`、`RepositoryCMS/Modules/`、`RepositoryCMS/Work/`、`Docs/`、作業データ、認証情報、ログイン失敗状態、CMSロック状態、CMS状態、ユーザーテーマ設定、サイト基本設定、広告配信枠設定、ナビゲーション設定、コンテンツデータ、公開成果物、運用履歴を変更してはならない。
+アップデートによって、`ServerSideLogicFramework/`、`StaticGenerator/`、`EditorSystem/`、`AdminFrontend/`、`RepositoryCMS/Core/Config/`、`RepositoryCMS/Core/App/`、`RepositoryCMS/Core/Data/`、`RepositoryCMS/Modules/`、`RepositoryCMS/Work/`、`Docs/`、特定目的型責務の開発正本、TypeScript正本、作業データ、認証情報、ログイン失敗状態、CMSロック状態、CMS状態、ユーザーテーマ設定、サイト基本設定、広告配信枠設定、ナビゲーション設定、固定ページ設定、テーマ表示設定、運用データベース、コンテンツデータ、公開成果物、運用履歴を変更してはならない。
 
 ---
 
@@ -787,17 +999,27 @@ RepositoryCMS/Core/ 内の開発元管理領域の扱いは以下とする。
 
 GitHubリポジトリでリリースを作成する際は、そのバージョンの実行、配布、検証に必要なファイルをすべて同梱する。
 
-リリースには `ServerSideLogicFramework/ServerSideLogicFramework.php` 本体を含める。
+リリースには `RepositoryCMS/Core/ServerSideLogicFramework.php` をCMS Core実行集約済みFramework本体コピーとして含める。
 
 リリースには `RepositoryCMS/Core/ServerSideLogicFrameworkClient.php` をCore組み込み済みクライアントとして含める。
 
-`ServerSideLogicFramework/ServerSideLogicFrameworkClient.php` 正本は開発元管理用であり、リリース配布物には含めない。
+`ServerSideLogicFramework/ServerSideLogicFramework.php` 本体正本と `ServerSideLogicFramework/ServerSideLogicFrameworkClient.php` クライアント正本は開発元管理用であり、リリース配布物には含めない。
 
-TypeScriptソースコードはリリース配布物に含めない。
+特定目的型モジュラーコンポーネントのTypeScriptソースコード正本は開発管理用であり、リリース配布物には含めない。
 
-TypeScript/JavaScript製移行後は、レンタルサーバで実行可能なJavaScript生成物のみをリリース配布物に含める。
+TypeScript/JavaScript製移行後は、レンタルサーバで動作可能なJavaScript生成物、または実行に必要な正本コピーのみをリリース配布物に含める。
 
-認証情報、トークン、秘密鍵、利用者データ、`RepositoryCMS/Core/Config/`、`RepositoryCMS/Work/`、`Docs/`、作業データ、公開成果物、運用履歴はリリース配布物に含めない。
+特定目的型モジュラーコンポーネントのリリース配布物には、CMS Coreへ直接実行集約されたJavaScript生成物、実行用正本コピー、実行時メタ情報、チェックサム、リリースマニフェスト上の定義のみを同梱する。
+
+各コンポーネントのリリース同梱対象は、コンポーネントごとの設計確定時に定義する。
+
+リリース配布物には、開発用設定、ビルド設定、テスト専用ファイル、TypeScript型定義のみの開発用ファイル、Node.js依存物、Deno依存物、外部ライブラリ取得前提のファイルを含めない。
+
+リリース配布物は、RepositoryCMS/Core/ に集約済みの実行に必要なファイル、整合性確認に必要なファイル、アップデート検証に必要なファイルのみで構成する。
+
+リリース作成時は、正本からコピーまたは生成した成果物であること、TypeScript正本が混入していないこと、禁止ファイルが混入していないこと、チェックサムが一致することを確認する。
+
+認証情報、トークン、秘密鍵、利用者データ、運用データベース、`RepositoryCMS/Core/Config/`、`RepositoryCMS/Work/`、`Docs/`、作業データ、公開成果物、運用履歴はリリース配布物に含めない。
 
 リリース前に `release-check.sh` で、必要ファイルの同梱漏れと禁止ファイルの混入を検査する。
 
@@ -855,8 +1077,14 @@ Coreアップデートは適用前に検証する。
 - Coreファイル数
 - 禁止パスの有無
 - RepositoryCMS/Core/Lang/ が許可対象として扱われていること
+- RepositoryCMS/Core/Runtime/ が不要対象として扱われていること
 - RepositoryCMS/Core/Themes/ が許可対象として扱われていること
 - RepositoryCMS/Core/ServerSideLogicFrameworkClient.php が正本コピーとして扱われていること
+- RepositoryCMS/Core/ServerSideLogicFramework.php が正本コピーとして扱われていること
+- ServerSideLogicFramework/ が含まれていないこと
+- StaticGenerator/ が含まれていないこと
+- EditorSystem/ が含まれていないこと
+- AdminFrontend/ が含まれていないこと
 - RepositoryCMS/Core/Config/ が含まれていないこと
 - RepositoryCMS/Core/App/ が含まれていないこと
 - RepositoryCMS/Core/Data/ が含まれていないこと
@@ -865,6 +1093,7 @@ Coreアップデートは適用前に検証する。
 - RepositoryCMS/Modules/ が含まれていないこと
 - RepositoryCMS/Work/ が含まれていないこと
 - Docs/ が含まれていないこと
+- 特定目的型責務の開発正本、TypeScript正本、ビルド設定、テスト専用ファイルが含まれていないこと
 
 検証に失敗した場合、アップデートを中止する。
 
@@ -916,7 +1145,7 @@ RepositoryCMS/Core/ServerSideLogicFrameworkClient\.php
 
 ↓
 
-ServerSideLogicFramework/ServerSideLogicFramework\.php
+RepositoryCMS/Core/ServerSideLogicFramework\.php
 
 ---
 
@@ -938,7 +1167,7 @@ TypeScript/JavaScript製移行を進めるバージョンでは例外として�
 
 仕様・設計・実装は同一バージョンで管理する。
 
-本仕様書に記載された内容を v\.0\.16 の対象範囲とする。
+本仕様書に記載された内容を v\.0\.18 の対象範囲とする。
 
 ---
 
@@ -973,7 +1202,7 @@ TypeScript/JavaScript製移行を進めるバージョンでは例外として�
 
 初期版では実装しない。
 
-- 記事と固定ページ
+- 記事
 - カテゴリー
 - タグ
 - メニュー
@@ -1024,8 +1253,10 @@ Repository CMSリポジトリ内で恒久管理し、別リポジトリへ分割
 - フレームワーク専用ドキュメントは `Docs/ServerSideLogicFramework/` で管理する
 - フレームワーク本体は `ServerSideLogicFramework/ServerSideLogicFramework.php` の単一ファイル原則とする
 - ServerSideLogicFrameworkクライアントツール正本は `ServerSideLogicFramework/ServerSideLogicFrameworkClient.php` の単一ファイル原則とする
+- フレームワーク本体正本はCMS Coreへ正本コピーとして実行集約し、`RepositoryCMS/Core/ServerSideLogicFramework.php` に配置する
+- ServerSideLogicFrameworkクライアントツール正本は `RepositoryCMS/Core/ServerSideLogicFrameworkClient.php` へ正本コピーとしてCoreへ実行集約する
 - Repository CMSとの連携は単一エントリーポイント経由方式を廃止し、クライアントツール経由の内部API方式とする
-- Repository CMSはServerSideLogicFrameworkクライアントツールを組み込まない場合、起動および動作してはならない
+- Repository CMSはServerSideLogicFramework本体コピーまたはクライアントツールをCoreへ組み込まない場合、起動および動作してはならない
 - ServerSideLogicFramework本体およびクライアントツールは、ServerSideLogicFramework開発元のみが開発、修正、保守、メンテナンス、配布する
 - 別リポジトリ分割を前提にせず、CMS本体と責務を混在させない
 - 採用する場合、Repository CMSは本フレームワークの仕様および機能に準拠する
@@ -1135,9 +1366,15 @@ Repository CMSは、ServerSideLogicFrameworkクライアントツール正本を
 
 Repository CMS側の組み込み先は RepositoryCMS/Core/ServerSideLogicFrameworkClient.php とする。
 
+ServerSideLogicFramework本体正本もコピーしてCoreへ組み込まなければならない。
+
+ServerSideLogicFramework本体コピーの組み込み先は RepositoryCMS/Core/ServerSideLogicFramework.php とする。
+
 Repository CMSは、独自作成、独自改変、部分改変、再実装したクライアントツールを使用してはならない。
 
-CMS側クライアントツールが未配置、破損、改変、不一致、互換性不一致、出所不明、署名不一致、チェックサム不一致の場合、Repository CMSは起動および動作してはならない。
+Repository CMSは、独自作成、独自改変、部分改変、再実装したFramework本体コピーを使用してはならない。
+
+CMS側クライアントツールまたはFramework本体コピーが未配置、破損、改変、不一致、互換性不一致、出所不明、署名不一致、チェックサム不一致の場合、Repository CMSは起動および動作してはならない。
 
 ServerSideLogicFramework本体およびServerSideLogicFrameworkクライアントツールは、ServerSideLogicFramework開発元のみが開発、修正、保守、メンテナンス、配布する。
 
@@ -1197,7 +1434,9 @@ Repository CMS本体の開発計画は、Framework準拠とRepository CMS本体�
 
 ServerSideLogicFrameworkクライアントツール正本は、ServerSideLogicFramework/ServerSideLogicFrameworkClient.php に集約する。
 
-Repository CMS本体側およびServerSideLogicFramework/直下の別PHPファイルには、サーバーサイドロジックフレームワーク関係の実装コード実体を残さない。
+Repository CMSのCMS Core開発集約対象およびServerSideLogicFramework/直下の別PHPファイルには、サーバーサイドロジックフレームワーク関係の実装コード実体を残さない。
+
+ServerSideLogicFramework本体正本は、CMS Coreへ正本コピーとして実行集約し、RepositoryCMS/Core/ServerSideLogicFramework.php に配置する。
 
 分離実装計画では、現在までのRepository CMS実装を分析対象とし、以下を整理する。
 
@@ -1208,6 +1447,7 @@ Repository CMS本体側およびServerSideLogicFramework/直下の別PHPファ�
 - 内部API経由方式の前提
 - 外部公開APIサーバーにしない前提
 - クライアントツール正本コピー必須の前提
+- Framework本体正本コピー必須の前提
 - ページ要求およびフォームPOSTで扱う処理
 - データ保全、CMSロック、メンテナンスモードとの関係
 
@@ -1239,7 +1479,9 @@ Server Side Logic Frameworkは、以下の段階で進める。
 
 ServerSideLogicFramework/ServerSideLogicFramework.php へ、認証、認可、ロック、CSRF、アップデート、作業データ保全の実装を配置する。
 
-配置後、Repository CMS本体側およびServerSideLogicFramework/直下の別PHPファイルにフレームワーク関係コード実体を残さない。
+配置後、Repository CMSのCMS Core開発集約対象およびServerSideLogicFramework/直下の別PHPファイルにフレームワーク関係コード実体を残さない。
+
+配置後、ServerSideLogicFramework本体正本とクライアントツール正本をCoreへ実行集約する。
 
 ## Phase 5: 強化
 
@@ -1260,6 +1502,8 @@ Repository CMS本体のTypeScript/JavaScript製移行計画は、v.0.18以降に
 Repository CMS本体は、Server Side Logic Frameworkの仕様および機能に準拠して開発する。
 
 Repository CMS本体は、フレームワーク内部クラスを直接呼び出さず、Coreへ組み込まれたServerSideLogicFrameworkクライアントツールを通じて内部APIを利用する。
+
+Repository CMSの実行時に使用するFramework本体は、CMS Coreへ実行集約された正本コピーとする。
 
 ---
 
@@ -1292,6 +1536,7 @@ Server Side Logic Framework候補は以下とする。
 - サーバーサイド最終判定
 - 内部API経由方式
 - クライアントツール正本コピー
+- Framework本体正本コピー
 
 今後のRepository CMS部分は以下とする。
 
@@ -1318,6 +1563,7 @@ Server Side Logic Frameworkは、安定版ができるまで以下を継続す�
 - 内部API経由方式の確認
 - 外部公開APIサーバー非採用方針の確認
 - クライアントツール正本コピー一致確認
+- Framework本体正本コピー一致確認
 - データ保全とCMSロックの整合性確認
 - アップデートとメンテナンスモードの整合性確認
 
