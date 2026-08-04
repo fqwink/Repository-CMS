@@ -29,6 +29,7 @@ final class Runtime
         self::ensureDirectory($dataRoot);
         self::ensureDirectory($dataRoot . '/auth');
         self::ensureDirectory($dataRoot . '/locks');
+        self::ensureDirectory($dataRoot . '/theme');
         self::ensureDirectory($workRoot);
 
         $config = Config::fromEnvironment();

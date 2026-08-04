@@ -31,19 +31,27 @@ final class ContentManager
         Security::validateContent($path, $bytes);
         $workPath = $this->runtime->workData->write(basename($path), $bytes);
         $checksum = $this->runtime->workData->checksum($bytes);
-        if (!$this->runtime->workData->verified($workPath, $checksum)) {
-            $this->runtime->locks->lock('保存作業データのチェックサムが一致しません。');
-            throw new \RuntimeException('保存作業データの保全確認に失敗しました。');
-        }
+        try {
+            if (!$this->runtime->workData->verified($workPath, $checksum)) {
+                $this->runtime->locks->lock('保存作業データのチェックサムが一致しません。');
+                throw new \RuntimeException('保存作業データの保全確認に失敗しました。');
+            }
 
-        $this->runtime->git->saveContent($path, $bytes, 'Repository CMS save: ' . $path);
-        $fetched = $this->runtime->git->readContent($path);
-        if (!hash_equals($checksum, $this->runtime->workData->checksum($fetched))) {
-            $this->runtime->locks->lock('保存後の再取得チェックサムが一致しません。');
-            throw new \RuntimeException('データ保全確認に失敗しました。');
-        }
+            $this->runtime->git->saveContent($path, $bytes, 'Repository CMS save: ' . $path);
+            $fetched = $this->runtime->git->readContent($path);
+            if (!hash_equals($checksum, $this->runtime->workData->checksum($fetched))) {
+                $this->runtime->locks->lock('保存後の再取得チェックサムが一致しません。');
+                throw new \RuntimeException('データ保全確認に失敗しました。');
+            }
 
-        $this->runtime->workData->cleanupAfterVerified();
+            $this->runtime->workData->cleanupAfterVerified();
+        } catch (\Throwable $error) {
+            if (!$this->runtime->locks->locked()) {
+                $this->runtime->locks->lock('保存処理の保全確認に失敗しました。');
+            }
+            $this->runtime->workData->cleanupAfterVerified();
+            throw $error;
+        }
     }
 
     public function history(string $path): array

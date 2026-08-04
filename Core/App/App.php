@@ -52,8 +52,9 @@ final class App
                 'restore' => $this->restore(),
                 'generate' => $this->generate(),
                 'publish' => $this->publish(),
+                'themes' => $this->themes(),
+                'theme_save' => $this->saveTheme(),
                 'updates' => $this->updates(),
-                'update_apply' => $this->applyUpdate(),
                 default => $this->index(),
             };
         } catch (\Throwable $error) {
@@ -153,6 +154,7 @@ final class App
             ['作成', '?action=new', '新しいコンテンツを作成します。', !$locked],
             ['静的生成', '?action=generate', 'コンテンツから公開成果物を生成します。', !$locked],
             ['公開', '?action=publish', '生成成果物を公開リポジトリへ保存します。', !$locked],
+            ['テーマ', '?action=themes', '静的生成で使用するテーマを選択します。', !$locked],
             ['アップデート', '?action=updates', '開発元リリースを確認します。', true],
         ];
         $html = '<section class="panel"><div class="section-title"><h2>操作</h2><span class="badge">運用</span></div>' . $disabledNote . '<div class="action-grid">';
@@ -291,62 +293,109 @@ final class App
         if ($rows === '') {
             $rows = '<tr><td colspan="6" class="muted">生成対象はありません。</td></tr>';
         }
-        return '<section class="panel"><h2>' . Response::escape($title) . '</h2><div class="summary-grid"><div><span>生成対象</span><strong>' . (int) ($report['total'] ?? 0) . '</strong></div><div><span>成功</span><strong>' . (int) ($report['succeeded'] ?? 0) . '</strong></div><div><span>失敗</span><strong>' . (int) ($report['failed'] ?? 0) . '</strong></div></div><table class="list"><tr><th>生成対象</th><th>出力</th><th>拡張子</th><th>状態</th><th>チェックサム</th><th>理由</th></tr>' . $rows . '</table></section>';
+        return '<section class="panel"><h2>' . Response::escape($title) . '</h2><div class="summary-grid"><div><span>有効テーマ</span><strong>' . Response::escape((string) ($report['theme'] ?? 'standard')) . '</strong></div><div><span>生成対象</span><strong>' . (int) ($report['total'] ?? 0) . '</strong></div><div><span>成功</span><strong>' . (int) ($report['succeeded'] ?? 0) . '</strong></div><div><span>失敗</span><strong>' . (int) ($report['failed'] ?? 0) . '</strong></div></div><table class="list"><tr><th>生成対象</th><th>出力</th><th>拡張子</th><th>状態</th><th>チェックサム</th><th>理由</th></tr>' . $rows . '</table></section>';
+    }
+
+    private function themes(): void
+    {
+        $active = $this->activeThemeName();
+        $rows = '';
+        foreach (StaticGenerator::themes() as $theme) {
+            $name = (string) $theme['name'];
+            $checked = $active === $name ? ' checked' : '';
+            $rows .= '<label class="theme-option"><input type="radio" name="theme" value="' . Response::escape($name) . '"' . $checked . '><span><strong>' . Response::escape((string) $theme['label']) . '</strong><em>' . Response::escape((string) $theme['description']) . '</em></span><i style="background:' . Response::escape((string) $theme['primary']) . '"></i><i style="background:' . Response::escape((string) $theme['secondary']) . '"></i><i style="background:' . Response::escape((string) $theme['accent']) . '"></i></label>';
+        }
+        $body = '<section class="panel"><h2>テーマ管理</h2><p class="muted">静的生成時に使用する標準テーマを1個選択します。管理画面は公開テーマの影響を受けません。</p><form method="post" action="?action=theme_save"><input type="hidden" name="csrf" value="' . Security::csrfToken() . '">' . $rows . '<p><button>保存</button></p></form></section>';
+        Response::html('テーマ管理', $body, $this->runtime);
+    }
+
+    private function saveTheme(): void
+    {
+        Security::requireCsrf();
+        $theme = (string) ($_POST['theme'] ?? '');
+        $this->writeActiveTheme($theme);
+        $this->audit('theme.save', ['theme' => $theme, 'user' => $this->runtime->auth->user()]);
+        Response::redirect('?action=themes');
+    }
+
+    private function activeThemeName(): string
+    {
+        $path = $this->themeSettingsPath();
+        if (!is_file($path)) {
+            return 'standard';
+        }
+        $bytes = file_get_contents($path);
+        if ($bytes === false) {
+            $this->runtime->locks->lock('テーマ設定を読み取れません。');
+            throw new \RuntimeException('テーマ設定を読み取れません。');
+        }
+        $data = json_decode($bytes, true);
+        $theme = is_array($data) ? (string) ($data['active_theme'] ?? '') : '';
+        if (!StaticGenerator::validTheme($theme)) {
+            $this->runtime->locks->lock('有効テーマが不正です。');
+            throw new \RuntimeException('有効テーマが不正です。');
+        }
+        return $theme;
+    }
+
+    private function writeActiveTheme(string $theme): void
+    {
+        if (!StaticGenerator::validTheme($theme)) {
+            throw new \InvalidArgumentException('テーマが不正です。');
+        }
+        $path = $this->themeSettingsPath();
+        $payload = json_encode([
+            'active_theme' => $theme,
+            'updated_at' => gmdate(DATE_ATOM),
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if ($payload === false || file_put_contents($path, $payload, LOCK_EX) === false) {
+            $this->runtime->locks->lock('テーマ設定を保存できません。');
+            throw new \RuntimeException('テーマ設定を保存できません。');
+        }
+        $readBack = file_get_contents($path);
+        if ($readBack === false || !hash_equals(hash('sha256', $payload), hash('sha256', $readBack))) {
+            $this->runtime->locks->lock('テーマ設定の保全確認に失敗しました。');
+            throw new \RuntimeException('テーマ設定の保全確認に失敗しました。');
+        }
+        $data = json_decode($readBack, true);
+        if (!is_array($data) || (string) ($data['active_theme'] ?? '') !== $theme) {
+            $this->runtime->locks->lock('テーマ設定の整合性確認に失敗しました。');
+            throw new \RuntimeException('テーマ設定の整合性確認に失敗しました。');
+        }
+    }
+
+    private function themeSettingsPath(): string
+    {
+        $directory = $this->runtime->dataRoot . '/theme';
+        if (!is_dir($directory) && !mkdir($directory, 0700, true) && !is_dir($directory)) {
+            $this->runtime->locks->lock('テーマ設定ディレクトリを作成できません。');
+            throw new \RuntimeException('テーマ設定ディレクトリを作成できません。');
+        }
+        return $directory . '/active.json';
     }
 
     private function updates(): void
     {
         $rows = '';
         $message = '';
+        $summary = '<div class="summary-grid"><div><span>アップデート設定</span><strong>' . Response::escape($this->runtime->config->updateConfigured() ? '設定済み' : '未設定') . '</strong></div><div><span>リポジトリ</span><strong>' . Response::escape($this->runtime->config->updateRepository === '' ? '-' : $this->runtime->config->updateRepository) . '</strong></div><div><span>ブランチ</span><strong>' . Response::escape($this->runtime->config->updateBranch) . '</strong></div><div><span>マニフェスト</span><strong>' . Response::escape($this->runtime->config->updateManifestPath) . '</strong></div></div>';
         try {
             foreach ($this->availableUpdateReleases() as $release) {
                 $version = (string) ($release['version'] ?? '');
                 $releasedAt = (string) ($release['released_at'] ?? '');
                 $php = (string) ($release['php'] ?? '');
-                $rows .= '<tr><td>' . Response::escape($version) . '</td><td>' . Response::escape($releasedAt) . '</td><td>' . Response::escape($php) . '</td><td><form method="post" action="?action=update_apply"><input type="hidden" name="csrf" value="' . Security::csrfToken() . '"><input type="hidden" name="version" value="' . Response::escape($version) . '"><button>選択して開始</button></form></td></tr>';
+                $targetVersion = (string) ($release['target_version'] ?? '');
+                $fileCount = is_array($release['files'] ?? null) ? count($release['files']) : 0;
+                $rows .= '<tr><td>' . Response::escape($version) . '</td><td>' . Response::escape($targetVersion === '' ? '-' : $targetVersion) . '</td><td>' . Response::escape($releasedAt) . '</td><td>' . Response::escape($php === '' ? '-' : $php) . '</td><td>' . $fileCount . '</td><td><span class="badge">通知のみ</span></td></tr>';
             }
         } catch (\Throwable $error) {
             $message = '<div class="alert">' . Response::escape($error->getMessage()) . '</div>';
         }
         if ($rows === '') {
-            $rows = '<tr><td colspan="4" class="muted">選択可能なアップデートはありません。</td></tr>';
+            $rows = '<tr><td colspan="6" class="muted">利用可能なアップデートはありません。</td></tr>';
         }
-        $body = $message . '<section class="panel"><h2>アップデート</h2><table class="list"><tr><th>バージョン</th><th>リリース日時</th><th>必須PHP</th><th></th></tr>' . $rows . '</table></section>';
+        $body = $message . '<section class="panel"><h2>アップデート</h2><p class="muted">v.0.7では開発元リリースの通知と一覧表示のみを行います。選択、事前検証、適用はv.0.8以降で扱います。</p>' . $summary . '<table class="list"><tr><th>バージョン</th><th>対象</th><th>リリース日時</th><th>必須PHP</th><th>ファイル数</th><th>状態</th></tr>' . $rows . '</table></section>';
         Response::html('アップデート', $body, $this->runtime);
-    }
-
-    private function applyUpdate(): void
-    {
-        Security::requireCsrf();
-        if ($this->runtime->locks->locked()) {
-            throw new \RuntimeException('CMSがロックされているため、アップデートを開始できません。');
-        }
-        $version = (string) ($_POST['version'] ?? '');
-        $release = $this->findUpdateRelease($version);
-        $this->runtime->locks->lock('メンテナンスモード: アップデート中です。');
-        try {
-            $this->validateUpdateRelease($release);
-            foreach ($release['files'] as $file) {
-                $targetPath = (string) ($file['path'] ?? '');
-                $sourcePath = (string) ($file['source'] ?? $targetPath);
-                $checksum = (string) ($file['checksum'] ?? '');
-                $bytes = $this->runtime->git->readUpdateFile($sourcePath);
-                if ($checksum === '' || !hash_equals($checksum, $this->runtime->workData->checksum($bytes))) {
-                    throw new \RuntimeException('アップデートファイルのチェックサムが一致しません: ' . $targetPath);
-                }
-                $workPath = $this->runtime->workData->write(basename($targetPath), $bytes);
-                if (!$this->runtime->workData->verified($workPath, $checksum)) {
-                    throw new \RuntimeException('アップデート作業データの保全確認に失敗しました: ' . $targetPath);
-                }
-                $this->writeUpdateTarget($targetPath, $bytes);
-            }
-            $this->runtime->workData->cleanupAfterVerified();
-            $this->runtime->locks->lock(self::MAINTENANCE_RELEASE_WAIT_REASON);
-            Response::html('アップデート', '<section class="panel"><h2>アップデート完了</h2><p>5分後に公開モードへ切り替えます。</p></section>', $this->runtime);
-        } catch (\Throwable $error) {
-            $this->runtime->locks->lock('アップデート失敗: ' . $error->getMessage());
-            throw $error;
-        }
     }
 
     private function audit(string $type, array $data = []): void
@@ -409,8 +458,9 @@ final class App
             'preview',
             'generate',
             'publish',
+            'themes',
+            'theme_save',
             'updates',
-            'update_apply',
         ], true);
     }
 
@@ -434,6 +484,9 @@ final class App
             if (!is_array($release)) {
                 continue;
             }
+            if (!$this->validUpdateReleaseSummary($release)) {
+                continue;
+            }
             $version = (string) ($release['version'] ?? '');
             if ($version !== '' && $this->newerThanCurrent($version)) {
                 $items[] = $release;
@@ -443,69 +496,25 @@ final class App
         return $items;
     }
 
-    private function findUpdateRelease(string $version): array
-    {
-        foreach ($this->availableUpdateReleases() as $release) {
-            if ((string) ($release['version'] ?? '') === $version) {
-                return $release;
-            }
-        }
-        throw new \RuntimeException('選択されたアップデートは利用できません。');
-    }
-
-    private function validateUpdateRelease(array $release): void
+    private function validUpdateReleaseSummary(array $release): bool
     {
         $version = (string) ($release['version'] ?? '');
         $targetVersion = (string) ($release['target_version'] ?? '');
+        $releasedAt = (string) ($release['released_at'] ?? '');
         $php = (string) ($release['php'] ?? '');
         $files = $release['files'] ?? null;
-        if ($version === '' || !$this->newerThanCurrent($version)) {
-            throw new \RuntimeException('アップデートバージョンが不正です。');
-        }
-        if ($targetVersion !== Config::VERSION) {
-            throw new \RuntimeException('対象バージョンが現在バージョンと一致しません。');
-        }
-        if ($php === '' || version_compare(PHP_VERSION, $php, '<')) {
-            throw new \RuntimeException('必須PHPバージョンを満たしていません。');
-        }
-        if (!is_array($files) || $files === []) {
-            throw new \RuntimeException('アップデート対象ファイル一覧が不正です。');
+        if ($version === '' || $targetVersion === '' || $releasedAt === '' || $php === '' || !is_array($files)) {
+            return false;
         }
         foreach ($files as $file) {
             if (!is_array($file)) {
-                throw new \RuntimeException('アップデート対象ファイル一覧が不正です。');
+                return false;
             }
-            $path = (string) ($file['path'] ?? '');
-            $source = (string) ($file['source'] ?? $path);
-            if (!$this->validUpdateTarget($path) || !Security::validRepositoryPath($source)) {
-                throw new \RuntimeException('アップデート禁止パスが含まれています。');
-            }
-            if ((string) ($file['checksum'] ?? '') === '') {
-                throw new \RuntimeException('Coreファイルチェックサムが不足しています。');
+            if ((string) ($file['path'] ?? '') === '' || (string) ($file['checksum'] ?? '') === '') {
+                return false;
             }
         }
-        $this->assertWorkClean();
-    }
-
-    private function writeUpdateTarget(string $path, string $bytes): void
-    {
-        $root = dirname($this->runtime->coreRoot);
-        $target = $root . '/' . $path;
-        $directory = dirname($target);
-        if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) {
-            throw new \RuntimeException('アップデート対象ディレクトリを作成できません。');
-        }
-        if (file_put_contents($target, $bytes, LOCK_EX) === false) {
-            throw new \RuntimeException('アップデート対象ファイルを書き込めません: ' . $path);
-        }
-    }
-
-    private function validUpdateTarget(string $path): bool
-    {
-        if ($path === 'Core/app.php' || $path === 'Core/.htaccess') {
-            return true;
-        }
-        return preg_match('/^Core\/App\/[A-Za-z0-9_.-]+\.php$/', $path) === 1;
+        return true;
     }
 
     private function newerThanCurrent(string $version): bool
@@ -527,15 +536,6 @@ final class App
         $created = strtotime((string) ($state['created_at'] ?? ''));
         if ($created !== false && time() - $created >= 300) {
             $this->runtime->locks->clear();
-        }
-    }
-
-    private function assertWorkClean(): void
-    {
-        foreach (new \FilesystemIterator($this->runtime->workRoot, \FilesystemIterator::SKIP_DOTS) as $item) {
-            if ($item->getFilename() !== '.gitignore') {
-                throw new \RuntimeException('アップデート開始前の作業データ保全状態を確認できません。');
-            }
         }
     }
 }
