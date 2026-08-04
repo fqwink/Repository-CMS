@@ -4,6 +4,14 @@
 
 ---
 
+## v.0.10
+
+- 利用者データ資産を所有しない共通思想をMaster_Specへ明記。
+- データ保全とセキュリティを最優先、最重視するFramework概念を整理。
+- Repository CMSは操作、Frameworkは安全判定を担当する責務境界を明確化。
+
+---
+
 ## v.0.9
 
 - Master_Designの存在しない旧フロントサイド表記を現行RepositoryCMS/Core/App連携へ修正。

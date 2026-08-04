@@ -4,6 +4,14 @@
 
 ---
 
+## v.0.21
+
+- Repository CMSとServerSideLogicFramework共通の利用者データ資産非所有思想をMaster_Specへ明記。
+- データ保全、セキュリティ、利用者データ資産の非所有を最上位思想として整理。
+- CMSは操作環境、Frameworkは安全制御基盤とする責務境界を明確化。
+
+---
+
 ## v.0.20
 
 - Master_SpecとMaster_Designの旧Core/Work/Docs表記をRepositoryCMS構成へ整理。
