@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
-namespace RepositoryCms\Core;
+namespace ServerSideLogicFramework;
+
+use RepositoryCms\Core\Runtime;
 
 final class UpdateApplier
 {

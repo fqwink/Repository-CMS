@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace RepositoryCms\Core;
 
+use ServerSideLogicFramework\Auth;
+use ServerSideLogicFramework\LockManager;
+use ServerSideLogicFramework\ServerSideLogicFramework;
+use ServerSideLogicFramework\WorkData;
+
 final class Runtime
 {
     public function __construct(
@@ -16,6 +21,7 @@ final class Runtime
         public readonly WorkData $workData,
         public readonly GitProvider $git,
         public readonly Auth $auth,
+        public readonly ServerSideLogicFramework $serverSide,
     ) {
     }
 
@@ -35,6 +41,8 @@ final class Runtime
         $workData = new WorkData($workRoot, $locks);
         $git = GitHubProvider::fromConfig($config, $locks);
 
+        $auth = new Auth($configRoot . '/auth.json', $configRoot . '/login_state.json', $configRoot . '/admin_initial_state.json');
+
         return new self(
             $coreRoot,
             $appRoot,
@@ -44,7 +52,8 @@ final class Runtime
             $locks,
             $workData,
             $git,
-            new Auth($configRoot . '/auth.json', $configRoot . '/login_state.json', $configRoot . '/admin_initial_state.json'),
+            $auth,
+            new ServerSideLogicFramework($auth, $locks),
         );
     }
 

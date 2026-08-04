@@ -1,0 +1,255 @@
+# Server Side Logic Framework
+
+# マスター仕様書
+
+**Version:** v.0.5
+
+---
+
+# 1. 製品概要
+
+Server Side Logic Frameworkは、Repository CMSと並行開発するサーバーサイド安全制御基盤である。
+
+Repository CMSリポジトリ内で恒久管理し、別リポジトリへ分割しない。
+
+別リポジトリ分割計画は、開発コスト削減と開発効率化を優先するため廃止する。
+
+---
+
+# 2. 基本方針
+
+- Repository CMS本体とは別責務として扱う
+- ルート直下の `ServerSideLogicFramework/` で管理する
+- フレームワーク専用ドキュメントは `ServerSideLogicFramework/Docs/` で管理する
+- フレームワーク関係の実装コードを `ServerSideLogicFramework/` へ分離配置する
+- 別リポジトリ分割を前提にせず、CMS本体と責務を混在させない
+- 採用する場合、Repository CMSは本フレームワークの仕様および機能に準拠する
+- Repository CMS本体のTypeScript/JavaScript製移行計画および凍結中の開発計画案より、本フレームワークの原型作成、強化、安定版作成を優先する
+- 安定版完成後も、Repository CMS本体との運用適合確認が完了するまで凍結中の開発計画案へ戻らない
+- 現在のRepository CMSを活用し、サーバーサイドロジックフレームワーク部分と今後のCMS部分を段階的に分離する
+- 分離作業は、本フレームワーク安定版ができるまで継続する
+
+---
+
+# 3. 実行方針
+
+サーバーサイドロジックフレームワークは、APIサーバーとして扱わない。
+
+JSON API、REST API、内部API、fetch前提の処理を持たない。
+
+ページ要求およびフォームPOSTの範囲で、サーバーサイド安全制御を担当する。
+
+---
+
+# 4. 単一エントリーポイント
+
+Repository CMSで採用する場合、すべてのHTTPアクセスは `Core/app.php` を経由する。
+
+`Core/app.php` は、サーバーサイドロジックフレームワークとTypeScript/JavaScript製CMSフロントサイドの連携システムとして位置付ける。
+
+---
+
+# 5. 対象機能
+
+本フレームワークの対象機能は以下とする。
+
+- 認証
+- 認可
+- 一時ロック
+- セッション
+- CSRF
+- アップデート
+- メンテナンスモード
+- サーバーサイド最終判定
+
+---
+
+# 6. 対象外
+
+以下は本フレームワークの対象外とする。
+
+- CMS本体
+- 管理画面
+- WYSIWYGエディタ
+- 静的生成ジェネレーター
+- Gitプロバイダー連携UI
+- テーマ管理UI
+- 広告配信枠管理UI
+- 多言語UI
+- プレビュー
+- 生成レポート
+
+---
+
+# 7. 原型作成と強化
+
+本フレームワークの原型は、現在までのRepository CMS実装を活用して作成する。
+
+原型作成では、既存CMS実装からサーバーサイド安全制御に関わる処理を原型素材として扱う。
+
+原型完成後は、直ちに凍結中のRepository CMS開発計画案へ戻らず、本フレームワークの強化を継続する。
+
+安定版完成後も、Repository CMS本体との責務分離、運用安全性、データ保全、アップデート運用、同一リポジトリ内での開発効率確認を優先する。
+
+凍結中の開発計画案の再開は、本フレームワーク安定版とRepository CMS本体の運用適合性を確認した後、別途判断する。
+
+---
+
+# 8. 分離実装計画
+
+ServerSideLogicFramework/ 直下へ、サーバーサイドロジックフレームワーク関係の実装コードを分離配置する。
+
+Repository CMS本体側には、サーバーサイドロジックフレームワーク関係の実装コード実体を残さない。
+
+分離実装計画では、現在までのRepository CMS実装を分析対象とし、以下を整理する。
+
+- サーバーサイド安全制御に該当する責務
+- Repository CMS本体に残す責務
+- フレームワーク化する責務
+- フレームワーク対象外とする責務
+- 単一エントリーポイント連携の前提
+- APIサーバーにしない前提
+- ページ要求およびフォームPOSTで扱う処理
+- データ保全、CMSロック、メンテナンスモードとの関係
+
+---
+
+# 9. 段階計画
+
+Server Side Logic Frameworkは、以下の段階で進める。
+
+## Phase 1: 既存CMS分析
+
+現在までのRepository CMS実装を分析し、フレームワーク原型に活用できる責務を分類する。
+
+この段階では既存CMS実装からフレームワーク対象責務を洗い出す。
+
+## Phase 2: 責務境界整理
+
+サーバーサイドロジックフレームワーク対象、Repository CMS本体対象、対象外を明確にする。
+
+認証、認可、一時ロック、セッション、CSRF、アップデート、メンテナンスモード、CMSロック、データ保全、サーバーサイド最終判定の関係を整理する。
+
+## Phase 3: 原型仕様確定
+
+原型で扱う最小機能、扱わない機能、Core/app.phpとの連携前提を確定する。
+
+原型仕様確定後、フレームワーク対象コードはServerSideLogicFramework/へ分離配置する。
+
+## Phase 4: 分離実装
+
+ServerSideLogicFramework/ 直下へ、認証、認可、ロック、CSRF、アップデート、作業データ保全の実装を配置する。
+
+配置後、Repository CMS本体側にフレームワーク関係コード実体を残さない。
+
+## Phase 5: 強化
+
+原型作成後、セキュリティ、データ保全、メンテナンス、アップデート、CMS本体との責務分離を強化する。
+
+## Phase 6: 安定版
+
+安定版完成後も凍結中のRepository CMS開発計画案へ直ちに戻らず、CMS本体との運用適合性を確認する。
+
+---
+
+# 10. 優先事項
+
+当面の最優先事項は、Server Side Logic Frameworkの責務整理、仕様整理、設計整理、分離実装、安定化である。
+
+Repository CMS本体のTypeScript/JavaScript製移行計画および凍結中の開発計画案は進めない。
+
+Repository CMS本体は、Server Side Logic Frameworkの仕様および機能に準拠して開発する。
+
+---
+
+# 11. 現在CMSからの分離方針
+
+現在のRepository CMS実装は、Server Side Logic Framework原型の素材として活用する。
+
+現在のRepository CMSから、サーバーサイド安全制御に該当する責務をServer Side Logic Framework候補として分離する。
+
+Repository CMS本体に残す責務は、今後のCMS部分として整理する。
+
+分離は一括移行ではなく、原型作成、責務整理、強化、安定版作成の各段階で進める。
+
+---
+
+# 12. 分離対象
+
+Server Side Logic Framework候補は以下とする。
+
+- 認証
+- 認可
+- 一時ロック
+- セッション
+- CSRF
+- アップデート
+- メンテナンスモード
+- CMSロック
+- データ保全
+- 作業データ保全
+- サーバーサイド最終判定
+- 単一エントリーポイント連携
+
+今後のRepository CMS部分は以下とする。
+
+- 管理画面
+- コンテンツ管理
+- 静的生成
+- Gitプロバイダー連携
+- テーマ管理
+- 公開制御
+- 生成レポート
+- CMS固有UI
+- CMS固有画面遷移
+
+---
+
+# 13. 安定版までの進行
+
+Server Side Logic Frameworkは、安定版ができるまで以下を継続する。
+
+- 既存CMS実装の分析
+- フレームワーク候補責務の整理
+- CMS本体責務の整理
+- ドキュメント分離
+- 単一エントリーポイント連携方針の確認
+- APIサーバー非採用方針の確認
+- データ保全とCMSロックの整合性確認
+- アップデートとメンテナンスモードの整合性確認
+
+安定版完成後も、Repository CMS本体への運用適合確認が完了するまで凍結中の開発計画案へ戻らない。
+
+---
+
+# 14. 分離実装
+
+分離実装では、以下をサーバーサイド安全制御フレームワークとする。
+
+- ServerSideLogicFramework/ServerSideLogicFramework.php
+- ServerSideLogicFramework/Auth.php
+- ServerSideLogicFramework/LockManager.php
+- ServerSideLogicFramework/Security.php
+- ServerSideLogicFramework/UpdateApplier.php
+- ServerSideLogicFramework/UpdateValidator.php
+- ServerSideLogicFramework/WorkData.php
+
+フレームワークは以下を担当する。
+
+- 起動時安全制御
+- メンテナンス解除待機判定
+- 認証
+- ログイン要求
+- 認可
+- CSRF
+- CMSロック
+- アップデート検証
+- アップデート適用
+- 作業データ保全
+- HTTPメソッド判定
+
+フレームワークはAPIサーバーではない。
+
+フレームワークはCore/App/Bootstrap.phpからオートロードされ、Core/App/Runtime.phpで保持される。
+
+Repository CMS本体は、フレームワーク仕様および機能に準拠して開発する。

@@ -17,6 +17,19 @@ spl_autoload_register(static function (string $class): void {
     }
 });
 
+spl_autoload_register(static function (string $class): void {
+    $prefix = 'ServerSideLogicFramework\\';
+    if (!str_starts_with($class, $prefix)) {
+        return;
+    }
+
+    $relative = substr($class, strlen($prefix));
+    $file = dirname(__DIR__, 2) . '/ServerSideLogicFramework/' . str_replace('\\', '/', $relative) . '.php';
+    if (is_file($file)) {
+        require $file;
+    }
+});
+
 final class Bootstrap
 {
     public static function run(string $coreRoot): void

@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace RepositoryCms\Core;
 
+use ServerSideLogicFramework\Security;
+use ServerSideLogicFramework\UpdateApplier;
+use ServerSideLogicFramework\UpdateValidator;
+
 final class App
 {
     private const MAINTENANCE_RELEASE_WAIT_REASON = 'メンテナンス解除待機中です。';
@@ -20,26 +24,25 @@ final class App
     public function handle(): void
     {
         try {
-            $this->releaseMaintenanceIfReady();
-            $this->runtime->auth->ensureInitialAdmin();
+            $this->runtime->serverSide->boot(self::MAINTENANCE_RELEASE_WAIT_REASON);
             $action = (string) ($_GET['action'] ?? 'index');
             if ($action === 'login') {
-                $this->authorize($action);
+                $this->runtime->serverSide->authorize($action);
                 $this->login();
                 return;
             }
             if ($action === 'logout') {
-                $this->runtime->auth->requireLogin();
-                $this->authorize($action);
+                $this->runtime->serverSide->requireLogin();
+                $this->runtime->serverSide->authorize($action);
                 $user = $this->runtime->auth->user();
                 $this->audit('auth.logout', ['user' => $user]);
                 $this->runtime->auth->logout();
                 Response::redirect('?action=login');
             }
 
-            $this->runtime->auth->requireLogin();
+            $this->runtime->serverSide->requireLogin();
             $this->redirectInitialAdminChange($action);
-            $this->authorize($action);
+            $this->runtime->serverSide->authorize($action);
             match ($action) {
                 'initial_admin' => $this->initialAdmin(),
                 'new' => $this->edit(null),
@@ -518,74 +521,7 @@ final class App
 
     private function requestMethod(): string
     {
-        return strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
-    }
-
-    private function authorize(string $action): void
-    {
-        if (!$this->knownOperation($action)) {
-            return;
-        }
-        if (!$this->runtime->auth->configured()) {
-            if ($action === 'index' || $action === 'login') {
-                return;
-            }
-            throw new \RuntimeException('認可されていない操作です。');
-        }
-        if ($action !== 'login' && $this->runtime->auth->user() === null) {
-            if ($action === 'index') {
-                return;
-            }
-            throw new \RuntimeException('認証が必要です。');
-        }
-        if (!$this->roleAllowed($action)) {
-            throw new \RuntimeException('この操作を行う権限がありません。');
-        }
-        if (!$this->runtime->locks->locked()) {
-            return;
-        }
-        if (in_array($action, ['index', 'updates', 'logout'], true)) {
-            return;
-        }
-        throw new \RuntimeException('CMSがロックされているため、この操作は実行できません。');
-    }
-
-    private function knownOperation(string $action): bool
-    {
-        return in_array($action, [
-            'index',
-            'login',
-            'initial_admin',
-            'logout',
-            'new',
-            'edit',
-            'save',
-            'history',
-            'restore',
-            'preview',
-            'generate',
-            'publish',
-            'themes',
-            'theme_save',
-            'updates',
-            'update_validate',
-            'update_apply',
-            'users',
-            'user_create',
-            'user_password',
-        ], true);
-    }
-
-    private function roleAllowed(string $action): bool
-    {
-        $role = $this->runtime->auth->role();
-        if ($role === 'admin') {
-            return true;
-        }
-        if ($role === 'editor') {
-            return in_array($action, ['index', 'logout', 'new', 'edit', 'save', 'history', 'restore', 'preview', 'generate'], true);
-        }
-        return in_array($action, ['index', 'login'], true);
+        return $this->runtime->serverSide->requestMethod();
     }
 
     private function updateNotice(): string
@@ -711,15 +647,4 @@ final class App
         return ltrim($version, 'v.');
     }
 
-    private function releaseMaintenanceIfReady(): void
-    {
-        $state = $this->runtime->locks->state();
-        if ($state['locked'] !== true || $state['reason'] !== self::MAINTENANCE_RELEASE_WAIT_REASON) {
-            return;
-        }
-        $created = strtotime((string) ($state['created_at'] ?? ''));
-        if ($created !== false && time() - $created >= 300) {
-            $this->runtime->locks->clear();
-        }
-    }
 }

@@ -13,11 +13,20 @@
 - `Docs/Master_Design`
 - `Docs/Brand_Color_Spec`
 - `Docs/Change_History`
+- `ServerSideLogicFramework/Docs/Master_Spec`
+- `ServerSideLogicFramework/Docs/Master_Design`
+- `ServerSideLogicFramework/Docs/Change_History`
 
 ## 基本方針
 
 - 既存の仕様・設計・ファイル構成を尊重すること。
 - ユーザーの明示指示がない限り、不要な仕様変更・大規模リファクタリング・削除を行わないこと。
+- TypeScript/JavaScript製移行計画および凍結中の開発計画案は、サーバーサイドロジックフレームワークの強化とRepository CMS本体への運用適合確認が完了するまで再開しないこと。
+- 当面は、ServerSideLogicFramework原型作成、強化、安定版作成、Repository CMS本体との責務分離、運用適合確認を最優先すること。
+- `ServerSideLogicFramework/` は同一リポジトリ内で恒久管理し、別リポジトリへ分割しないこと。
+- Repository CMS本体は、`ServerSideLogicFramework/` の仕様・機能に準拠して開発すること。
+- サーバーサイドロジックフレームワーク関係の実装コードは `ServerSideLogicFramework/` へ分離し、Repository CMS本体側へ実体を残さないこと。
+- サーバーサイドロジックフレームワーク関連ドキュメントは `ServerSideLogicFramework/Docs/` で管理し、Repository CMS本体関連ドキュメントは `Docs/` で管理すること。
 - `Docs/Master_Spec` の修正・変更・削除は、必ず事前にユーザーの承認を得てから行うこと。
 - `Docs/Master_Design` の修正・変更・削除は、必ず事前にユーザーの承認を得てから行うこと。
 - 判断に迷う変更は、実装前にユーザーへ確認すること。
@@ -59,7 +68,10 @@
 
 ## 開発元アップデート
 
-- 承認済み構成方針では、ルート直下のカウント対象フォルダは `Core/`、`Modules/`、`Work/` の最大3フォルダとし、`Docs/` はカウント対象外とすること。
+- 承認済み構成方針では、ルート直下のRepository CMS本体カウント対象フォルダは `Core/`、`Modules/`、`Work/` の最大3フォルダとし、`Docs/` と `ServerSideLogicFramework/` はカウント対象外とすること。
+- `ServerSideLogicFramework/` はRepository CMS本体とは別責務の並行開発領域とし、同一リポジトリ内で開発コスト削減と開発効率化を優先して管理すること。
+- `ServerSideLogicFramework/` を別リポジトリへ分割する計画は廃止すること。
+- 現在のRepository CMSを活用し、サーバーサイドロジックフレームワーク部分と今後のCMS部分を段階的に分離して、フレームワーク安定版ができるまで進めること。
 - 承認済み構成方針では、Core直下フォルダは最大7フォルダとし、現行方針は `Core/App/`、`Core/Config/` の2フォルダとすること。
 - 開発元のアップデート更新対象は `Core/app.php`、`Core/.htaccess`、`Core/App/` のみとすること。
 - 開発元は `Core/App/` 直下を更新、改良、バグ修正できること。

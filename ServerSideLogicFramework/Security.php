@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace RepositoryCms\Core;
+namespace ServerSideLogicFramework;
 
 final class Security
 {

@@ -44,7 +44,10 @@ if [ -z "${PHP_BIN:-}" ]; then
 fi
 
 echo "== PHP syntax =="
-for file in Core/app.php Core/App/*.php; do
+for file in Core/app.php Core/App/*.php ServerSideLogicFramework/*.php; do
+  if [ ! -f "$file" ]; then
+    continue
+  fi
   "$PHP_BIN" -l "$file" >/dev/null
 done
 
@@ -56,7 +59,7 @@ if [ "$core_app_count" -gt 23 ]; then
 fi
 
 echo "== Root directory count =="
-root_dirs=$(find . -mindepth 1 -maxdepth 1 -type d ! -name '.git' ! -name 'Docs' -print | sed 's#^\./##' | sort)
+root_dirs=$(find . -mindepth 1 -maxdepth 1 -type d ! -name '.git' ! -name 'Docs' ! -name 'ServerSideLogicFramework' -print | sed 's#^\./##' | sort)
 if [ "$root_dirs" != "Core
 Modules
 Work" ]; then
@@ -137,13 +140,14 @@ echo "== Conservation tests =="
 <?php
 require 'Core/App/Bootstrap.php';
 
-use RepositoryCms\Core\Auth;
 use RepositoryCms\Core\Config;
 use RepositoryCms\Core\ContentManager;
 use RepositoryCms\Core\GitProvider;
-use RepositoryCms\Core\LockManager;
 use RepositoryCms\Core\Runtime;
-use RepositoryCms\Core\WorkData;
+use ServerSideLogicFramework\Auth;
+use ServerSideLogicFramework\LockManager;
+use ServerSideLogicFramework\ServerSideLogicFramework;
+use ServerSideLogicFramework\WorkData;
 
 final class ReleaseCheckMemoryGit implements GitProvider
 {
@@ -181,7 +185,8 @@ function release_runtime(string $suffix, ReleaseCheckMemoryGit $git): array
     ]));
     $config = new Config('github', 'token', 'owner', 'content', 'public', 'ops', 'updates', 'main', 'updates/releases.json', 'main');
     $locks = new LockManager($base . '/config/cms_lock.json');
-    $runtime = new Runtime('/app/Core', '/app/Core/App', $base . '/config', $base . '/work', $config, $locks, new WorkData($base . '/work', $locks), $git, new Auth($base . '/config/auth.json', $base . '/config/login_state.json', $base . '/config/admin_initial_state.json'));
+    $auth = new Auth($base . '/config/auth.json', $base . '/config/login_state.json', $base . '/config/admin_initial_state.json');
+    $runtime = new Runtime('/app/Core', '/app/Core/App', $base . '/config', $base . '/work', $config, $locks, new WorkData($base . '/work', $locks), $git, $auth, new ServerSideLogicFramework($auth, $locks));
     return [$base, $runtime, $locks];
 }
 
@@ -239,13 +244,15 @@ echo "== update apply and users =="
 require 'Core/App/Bootstrap.php';
 
 use RepositoryCms\Core\App;
-use RepositoryCms\Core\Auth;
 use RepositoryCms\Core\Config;
 use RepositoryCms\Core\GitProvider;
-use RepositoryCms\Core\LockManager;
 use RepositoryCms\Core\Runtime;
-use RepositoryCms\Core\UpdateApplier;
-use RepositoryCms\Core\WorkData;
+use ServerSideLogicFramework\Auth;
+use ServerSideLogicFramework\LockManager;
+use ServerSideLogicFramework\Security;
+use ServerSideLogicFramework\ServerSideLogicFramework;
+use ServerSideLogicFramework\UpdateApplier;
+use ServerSideLogicFramework\WorkData;
 
 final class ReleaseCheckUpdateGit implements GitProvider
 {
@@ -289,7 +296,8 @@ file_put_contents($base . '/config/auth.json', json_encode([
 $config = new Config('github', 'token', 'owner', 'content', 'public', 'ops', 'updates', 'main', 'updates/releases.json', 'main');
 $locks = new LockManager($base . '/config/cms_lock.json');
 $git = new ReleaseCheckUpdateGit();
-$runtime = new Runtime($base . '/core', $base . '/core/App', $base . '/config', $base . '/work', $config, $locks, new WorkData($base . '/work', $locks), $git, new Auth($base . '/config/auth.json', $base . '/config/login_state.json', $base . '/config/admin_initial_state.json'));
+$auth = new Auth($base . '/config/auth.json', $base . '/config/login_state.json', $base . '/config/admin_initial_state.json');
+$runtime = new Runtime($base . '/core', $base . '/core/App', $base . '/config', $base . '/work', $config, $locks, new WorkData($base . '/work', $locks), $git, $auth, new ServerSideLogicFramework($auth, $locks));
 $_SESSION['admin'] = 'admin';
 $_SESSION['role'] = 'admin';
 $_SESSION['last_seen_at'] = time();
@@ -304,7 +312,7 @@ if (!str_contains($html, 'v.0.14') || !str_contains($html, '事前検証')) {
     exit(1);
 }
 $_SERVER['REQUEST_METHOD'] = 'POST';
-$_POST['csrf'] = RepositoryCms\Core\Security::csrfToken();
+$_POST['csrf'] = Security::csrfToken();
 $_POST['version'] = 'v.0.14';
 $method = new ReflectionMethod(App::class, 'validateUpdate');
 $method->setAccessible(true);
@@ -336,7 +344,8 @@ file_put_contents($badBase . '/work/.gitignore', '');
 file_put_contents($badBase . '/config/auth.json', file_get_contents($base . '/config/auth.json'));
 $badLocks = new LockManager($badBase . '/config/cms_lock.json');
 $badGit = new ReleaseCheckUpdateGit();
-$badRuntime = new Runtime($badBase . '/core', $badBase . '/core/App', $badBase . '/config', $badBase . '/work', $config, $badLocks, new WorkData($badBase . '/work', $badLocks), $badGit, new Auth($badBase . '/config/auth.json', $badBase . '/config/login_state.json', $badBase . '/config/admin_initial_state.json'));
+$badAuth = new Auth($badBase . '/config/auth.json', $badBase . '/config/login_state.json', $badBase . '/config/admin_initial_state.json');
+$badRuntime = new Runtime($badBase . '/core', $badBase . '/core/App', $badBase . '/config', $badBase . '/work', $config, $badLocks, new WorkData($badBase . '/work', $badLocks), $badGit, $badAuth, new ServerSideLogicFramework($badAuth, $badLocks));
 $failed = false;
 try {
     (new UpdateApplier($badRuntime, 'メンテナンス解除待機中です。'))->apply($badGit->listUpdateReleases()[0]);

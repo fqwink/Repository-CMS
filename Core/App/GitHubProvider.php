@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace RepositoryCms\Core;
 
+use ServerSideLogicFramework\LockManager;
+use ServerSideLogicFramework\Security;
+
 final class GitHubProvider implements GitProvider
 {
     private const API = 'https://api.github.com';

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace RepositoryCms\Core;
 
+use ServerSideLogicFramework\Security;
+
 final class ContentManager
 {
     public function __construct(private readonly Runtime $runtime)

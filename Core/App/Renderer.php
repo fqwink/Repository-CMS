@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace RepositoryCms\Core;
 
+use ServerSideLogicFramework\Security;
+
 final class Renderer
 {
     public function preview(string $path, string $bytes): string

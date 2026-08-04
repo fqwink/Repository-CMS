@@ -4,6 +4,22 @@
 
 ---
 
+## v.0.15
+
+- ServerSideLogicFrameworkの別リポジトリ分割計画を廃止し、同一リポジトリ内の恒久管理へ変更。
+- 認証、ロック、CSRF、アップデート、作業データ保全をServerSideLogicFrameworkへ分離。
+- Repository CMS本体からフレームワーク関係コード実体を削除し、準拠開発方針を明記。
+
+---
+
+## v.0.14
+
+- ServerSideLogicFrameworkをRepository CMS本体とは別責務の並行開発領域として追加。
+- ServerSideLogicFramework.phpを初期原型として追加し、認可と起動時安全制御を委譲。
+- release-checkをフレームワーク原型の構文確認とルート除外方針へ追従。
+
+---
+
 ## v.0.13
 
 - 実装バージョンをv.0.13へ更新し、release-checkをv.0.13基準へ追従。

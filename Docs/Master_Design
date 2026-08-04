@@ -42,6 +42,8 @@ Core/
     Lang/
     Themes/
   Config/
+ServerSideLogicFramework/
+  Docs/
 Modules/
 Work/
 Docs/
@@ -49,7 +51,11 @@ Docs/
 
 `public_html/` は採用しない。
 
-ルート直下のカウント対象フォルダは `Core/`、`Modules/`、`Work/` の最大3フォルダとし、`Docs/` はカウント対象外とする。
+ルート直下のRepository CMS本体カウント対象フォルダは `Core/`、`Modules/`、`Work/` の最大3フォルダとし、`Docs/` と `ServerSideLogicFramework/` はカウント対象外とする。
+
+`ServerSideLogicFramework/` はRepository CMS本体とは別責務の並行開発領域とし、同一リポジトリ内で恒久管理する。
+
+別リポジトリ分割計画は、開発コスト削減と開発効率化を優先するため廃止する。
 
 Core直下フォルダは最大7フォルダとし、現行方針では `App/`、`Config/` の2フォルダとする。
 
@@ -57,7 +63,98 @@ Core直下フォルダは最大7フォルダとし、現行方針では `App/`�
 
 ---
 
-# 4. 起動構造
+# 4. ServerSideLogicFramework設計
+
+サーバーサイドロジックフレームワークは `ServerSideLogicFramework/` で管理する。
+
+フレームワーク専用ドキュメントは以下とする。
+
+- `ServerSideLogicFramework/Docs/Master_Spec`
+- `ServerSideLogicFramework/Docs/Master_Design`
+- `ServerSideLogicFramework/Docs/Change_History`
+
+`ServerSideLogicFramework/` 直下は、サーバーサイドロジックフレームワーク関係の実装コードを配置対象とする。
+
+- `ServerSideLogicFramework.php`
+- `Auth.php`
+- `LockManager.php`
+- `Security.php`
+- `UpdateApplier.php`
+- `UpdateValidator.php`
+- `WorkData.php`
+- `Docs/`
+
+Repository CMS本体側には、サーバーサイドロジックフレームワーク関係の実装コード実体を残さない。
+
+Repository CMS本体の `Docs/` とフレームワークの `ServerSideLogicFramework/Docs/` は分離して管理する。
+
+Repository CMS本体に関する仕様、設計、変更履歴は `Docs/` に集約する。
+
+Server Side Logic Frameworkに関する仕様、設計、変更履歴は `ServerSideLogicFramework/Docs/` に集約する。
+
+Repository CMSは、フレームワーク仕様および機能に準拠して開発する。
+
+フレームワークを採用する場合、APIサーバーとして扱わず、JSON API、REST API、内部API、fetch前提の処理は設計対象外とする。
+
+採用時の連携構造は以下とする。
+
+```text
+Core/app.php
+  ↓
+ServerSideLogicFramework/
+  ↓
+Core/App/
+```
+
+`Core/app.php` は単一エントリーポイントであり、サーバーサイドロジックフレームワークとTypeScript/JavaScript製CMSフロントサイドの連携システムとして扱う。
+
+分離実装の連携構造は以下とする。
+
+```text
+Core/app.php
+  ↓
+Core/App/Bootstrap.php
+  ↓
+ServerSideLogicFramework/ServerSideLogicFramework.php
+  ↓
+Core/App/Runtime.php
+  ↓
+Core/App/App.php
+```
+
+`Bootstrap` はRepository CMS本体とServerSideLogicFrameworkのオートロードを担当する。
+
+`Runtime` は `ServerSideLogicFramework` と関連クラスを保持し、`App` は認証、認可、CSRF、ログイン要求、メンテナンス解除待機判定、HTTPメソッド判定、アップデート適用、作業データ保全をフレームワーク側へ委譲する。
+
+当面の設計優先順位は以下とする。
+
+1. Server Side Logic Framework原型作成
+2. Server Side Logic Framework強化
+3. Server Side Logic Framework安定版作成
+4. Repository CMS本体との責務分離
+5. Repository CMS本体のフレームワーク準拠
+6. 運用安全性、データ保全、アップデート運用の確認
+7. 凍結中の開発計画案再開可否の別途判断
+
+TypeScript/JavaScript製移行計画、CMSフロントサイド機能分割、静的生成ジェネレーターTS/JS化、広告配信枠、多言語化、WYSIWYGエディタ、ブログ機能などの凍結中開発計画案は、安定版完成だけでは再開しない。
+
+安定版完成後も、Repository CMS本体へ適用し、責務分離、単一エントリーポイント連携、API非採用、認証、認可、一時ロック、セッション、CSRF、アップデート、メンテナンスモード、CMSロック、データ保全の整合性を確認する。
+
+現在のRepository CMS実装は、以下の2領域へ段階的に分離する。
+
+```text
+Server Side Logic Framework
+  認証、認可、一時ロック、セッション、CSRF、アップデート、メンテナンスモード、CMSロック、データ保全、サーバーサイド最終判定
+
+Repository CMS
+  管理画面、コンテンツ管理、静的生成、Gitプロバイダー連携、テーマ管理、公開制御、生成レポート、CMS固有UI
+```
+
+分離作業は、Server Side Logic Framework安定版ができるまで継続する。
+
+---
+
+# 5. 起動構造
 
 ```text
 Core/app.php
@@ -73,7 +170,7 @@ Core/App/App.php
 
 ---
 
-# 5. Core構成
+# 6. Core構成
 
 Core更新領域は以下とする。
 
@@ -121,7 +218,7 @@ Core更新領域は以下とする。
 
 ---
 
-# 6. 設定領域
+# 7. 設定領域
 
 `Core/Config/` は作業データを含まない保護設定領域とする。
 
@@ -154,7 +251,7 @@ Core更新領域は以下とする。
 
 ---
 
-# 7. 作業データ領域
+# 8. 作業データ領域
 
 作業データの保存場所は `Work/` とする。
 
@@ -171,7 +268,7 @@ Core更新領域は以下とする。
 
 ---
 
-# 8. Gitプロバイダー設計
+# 9. Gitプロバイダー設計
 
 Gitプロバイダーは `GitProvider` インターフェースで抽象化する。
 
@@ -187,7 +284,7 @@ Gitプロバイダーは `GitProvider` インターフェースで抽象化す�
 
 ---
 
-# 9. 環境変数
+# 10. 環境変数
 
 ```text
 REPOSITORY_CMS_GIT_PROVIDER=github
@@ -206,7 +303,7 @@ Gitプロバイダー設定が不足する場合、CMSはロック状態にな�
 
 ---
 
-# 10. 認証・認可設計
+# 11. 認証・認可設計
 
 - CMS独自認証
 - 管理者1人
@@ -276,7 +373,7 @@ Cookie属性は以下とする。
 
 ---
 
-# 11. コンテンツ設計
+# 12. コンテンツ設計
 
 許可拡張子は以下のみとする。
 
@@ -291,7 +388,7 @@ JPEG系を含むその他形式は扱わない。
 
 ---
 
-# 12. データ保全設計
+# 13. データ保全設計
 
 正式保存は以下の流れで行う。
 
@@ -317,7 +414,7 @@ Work/の作業データ削除
 
 ---
 
-# 13. Web編集設計
+# 14. Web編集設計
 
 Web管理画面で提供する機能は以下とする。
 
@@ -355,7 +452,7 @@ CMSロック中は状態確認画面を優先して表示し、許可されな�
 
 ---
 
-# 14. 静的生成・公開設計
+# 15. 静的生成・公開設計
 
 静的生成はコンテンツデータをもとに `Work/` 上の作業データとして生成する。
 
@@ -415,7 +512,7 @@ v.0.6では、静的生成時に有効テーマを適用する。
 
 ---
 
-# 15. アップデート設計
+# 16. アップデート設計
 
 アップデートシステムは `Core/App/` に組み込む。
 
@@ -492,7 +589,7 @@ v.0.11では、アップデート操作は管理者のみ許可する。
 
 ---
 
-# 16. v.0.12-v.0.13 安定化設計
+# 17. v.0.12-v.0.13 安定化設計
 
 v.0.12とv.0.13は、新機能追加を行わないバグ修正・安定化リリースとする。
 
@@ -517,7 +614,7 @@ v.0.12とv.0.13は、新機能追加を行わないバグ修正・安定化リ�
 
 ---
 
-# 17. Modules設計
+# 18. Modules設計
 
 Modulesは開発元公認セカンドパーティー専用とする。
 
@@ -529,7 +626,7 @@ ModulesからCoreへの直接アクセスは禁止する。
 
 ---
 
-# 18. 将来機能
+# 19. 将来機能
 
 `Docs/Master_Spec` に将来機能として記載された機能は初期版では実装しない。
 
