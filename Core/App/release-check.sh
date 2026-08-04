@@ -116,9 +116,9 @@ else
   echo "git not found; skipped tracked config check."
 fi
 
-echo "== Future content features not exposed in v0.11 =="
+echo "== Future content features not exposed in v0.13 =="
 if grep -R --exclude='release-check.sh' -n -E 'blog_post|ad_slot|広告枠を作成|ブログ投稿' Core/App AGENTS.md >/dev/null 2>&1; then
-  echo "v0.12+ content feature code or UI is exposed in v0.11." >&2
+  echo "v0.14+ content feature code or UI is exposed in v0.13." >&2
   grep -R --exclude='release-check.sh' -n -E 'blog_post|ad_slot|広告枠を作成|ブログ投稿' Core/App AGENTS.md >&2
   exit 1
 fi
@@ -181,7 +181,7 @@ function release_runtime(string $suffix, ReleaseCheckMemoryGit $git): array
     ]));
     $config = new Config('github', 'token', 'owner', 'content', 'public', 'ops', 'updates', 'main', 'updates/releases.json', 'main');
     $locks = new LockManager($base . '/config/cms_lock.json');
-    $runtime = new Runtime('/app/Core', '/app/Core/App', $base . '/config', $base . '/work', $config, $locks, new WorkData($base . '/work', $locks), $git, new Auth($base . '/config/auth.json', $base . '/config/login_state.json'));
+    $runtime = new Runtime('/app/Core', '/app/Core/App', $base . '/config', $base . '/work', $config, $locks, new WorkData($base . '/work', $locks), $git, new Auth($base . '/config/auth.json', $base . '/config/login_state.json', $base . '/config/admin_initial_state.json'));
     return [$base, $runtime, $locks];
 }
 
@@ -233,7 +233,7 @@ if (StaticGenerator::validTheme('custom')) {
 echo "theme-source-ok\n";
 PHP
 
-echo "== v0.11 update apply and users =="
+echo "== update apply and users =="
 "$PHP_BIN" <<'PHP'
 <?php
 require 'Core/App/Bootstrap.php';
@@ -249,7 +249,7 @@ use RepositoryCms\Core\WorkData;
 
 final class ReleaseCheckUpdateGit implements GitProvider
 {
-    public string $updateBytes = '<?php echo "v0.12";';
+    public string $updateBytes = '<?php echo "v0.14";';
     public bool $badBytes = false;
 
     public function configured(): bool { return true; }
@@ -264,8 +264,8 @@ final class ReleaseCheckUpdateGit implements GitProvider
     public function listUpdateReleases(): array
     {
         return [
-            ['version' => 'v.0.12', 'target_version' => 'v.0.11', 'released_at' => '2026-08-04T00:00:00Z', 'php' => '8.4', 'files' => [['path' => 'Core/App/App.php', 'source' => 'updates/v0.12/Core/App/App.php', 'checksum' => hash('sha256', $this->updateBytes)]]],
-            ['version' => 'v.0.11', 'target_version' => 'v.0.10', 'released_at' => '2026-08-04T00:00:00Z', 'php' => '8.4', 'files' => [['path' => 'Core/App/App.php', 'source' => 'updates/v0.11/Core/App/App.php', 'checksum' => str_repeat('a', 64)]]],
+            ['version' => 'v.0.14', 'target_version' => 'v.0.13', 'released_at' => '2026-08-04T00:00:00Z', 'php' => '8.4', 'files' => [['path' => 'Core/App/App.php', 'source' => 'updates/v0.14/Core/App/App.php', 'checksum' => hash('sha256', $this->updateBytes)]]],
+            ['version' => 'v.0.13', 'target_version' => 'v.0.12', 'released_at' => '2026-08-04T00:00:00Z', 'php' => '8.4', 'files' => [['path' => 'Core/App/App.php', 'source' => 'updates/v0.13/Core/App/App.php', 'checksum' => str_repeat('a', 64)]]],
             ['version' => 'broken'],
         ];
     }
@@ -289,7 +289,7 @@ file_put_contents($base . '/config/auth.json', json_encode([
 $config = new Config('github', 'token', 'owner', 'content', 'public', 'ops', 'updates', 'main', 'updates/releases.json', 'main');
 $locks = new LockManager($base . '/config/cms_lock.json');
 $git = new ReleaseCheckUpdateGit();
-$runtime = new Runtime($base . '/core', $base . '/core/App', $base . '/config', $base . '/work', $config, $locks, new WorkData($base . '/work', $locks), $git, new Auth($base . '/config/auth.json', $base . '/config/login_state.json'));
+$runtime = new Runtime($base . '/core', $base . '/core/App', $base . '/config', $base . '/work', $config, $locks, new WorkData($base . '/work', $locks), $git, new Auth($base . '/config/auth.json', $base . '/config/login_state.json', $base . '/config/admin_initial_state.json'));
 $_SESSION['admin'] = 'admin';
 $_SESSION['role'] = 'admin';
 $_SESSION['last_seen_at'] = time();
@@ -299,31 +299,31 @@ $method->setAccessible(true);
 ob_start();
 $method->invoke($app);
 $html = ob_get_clean();
-if (!str_contains($html, 'v.0.12') || !str_contains($html, '事前検証')) {
-    fwrite(STDERR, "v0.11 update list failed\n");
+if (!str_contains($html, 'v.0.14') || !str_contains($html, '事前検証')) {
+    fwrite(STDERR, "update list failed\n");
     exit(1);
 }
 $_SERVER['REQUEST_METHOD'] = 'POST';
 $_POST['csrf'] = RepositoryCms\Core\Security::csrfToken();
-$_POST['version'] = 'v.0.12';
+$_POST['version'] = 'v.0.14';
 $method = new ReflectionMethod(App::class, 'validateUpdate');
 $method->setAccessible(true);
 ob_start();
 $method->invoke($app);
 $html = ob_get_clean();
 if (!str_contains($html, '検証は成功しました') || !str_contains($html, 'アップデート適用')) {
-    fwrite(STDERR, "v0.11 update validation failed\n");
+    fwrite(STDERR, "update validation failed\n");
     exit(1);
 }
 
 $report = (new UpdateApplier($runtime, 'メンテナンス解除待機中です。'))->apply($git->listUpdateReleases()[0]);
 if ($report['valid'] !== true || file_get_contents($base . '/core/App/App.php') !== $git->updateBytes || $locks->state()['reason'] !== 'メンテナンス解除待機中です。') {
-    fwrite(STDERR, "v0.11 update apply failed\n");
+    fwrite(STDERR, "update apply failed\n");
     exit(1);
 }
 $entries = array_values(array_diff(scandir($base . '/work'), ['.', '..']));
 if ($entries !== ['.gitignore']) {
-    fwrite(STDERR, "v0.11 update work cleanup failed\n");
+    fwrite(STDERR, "update work cleanup failed\n");
     exit(1);
 }
 
@@ -336,7 +336,7 @@ file_put_contents($badBase . '/work/.gitignore', '');
 file_put_contents($badBase . '/config/auth.json', file_get_contents($base . '/config/auth.json'));
 $badLocks = new LockManager($badBase . '/config/cms_lock.json');
 $badGit = new ReleaseCheckUpdateGit();
-$badRuntime = new Runtime($badBase . '/core', $badBase . '/core/App', $badBase . '/config', $badBase . '/work', $config, $badLocks, new WorkData($badBase . '/work', $badLocks), $badGit, new Auth($badBase . '/config/auth.json', $badBase . '/config/login_state.json'));
+$badRuntime = new Runtime($badBase . '/core', $badBase . '/core/App', $badBase . '/config', $badBase . '/work', $config, $badLocks, new WorkData($badBase . '/work', $badLocks), $badGit, new Auth($badBase . '/config/auth.json', $badBase . '/config/login_state.json', $badBase . '/config/admin_initial_state.json'));
 $failed = false;
 try {
     (new UpdateApplier($badRuntime, 'メンテナンス解除待機中です。'))->apply($badGit->listUpdateReleases()[0]);
@@ -348,7 +348,7 @@ if (!$failed || !$badLocks->locked()) {
     exit(1);
 }
 
-$auth = new Auth($base . '/config/auth.json', $base . '/config/login_state.json');
+$auth = new Auth($base . '/config/auth.json', $base . '/config/login_state.json', $base . '/config/admin_initial_state.json');
 $auth->createUser('editor1', 'Password123456', 'editor');
 $auth->createUser('editor2', 'Password123456', 'editor');
 $tooManyEditors = false;
@@ -364,7 +364,45 @@ try {
     $tooManyAdmins = true;
 }
 if (!$tooManyEditors || !$tooManyAdmins || count($auth->users()) !== 3) {
-    fwrite(STDERR, "v0.11 users failed\n");
+    fwrite(STDERR, "users failed\n");
+    exit(1);
+}
+
+$initialBase = sys_get_temp_dir() . '/repository-cms-release-initial-admin-' . bin2hex(random_bytes(4));
+mkdir($initialBase . '/config', 0700, true);
+$initialAuth = new Auth($initialBase . '/config/auth.json', $initialBase . '/config/login_state.json', $initialBase . '/config/admin_initial_state.json');
+$initialAuth->ensureInitialAdmin();
+if (!$initialAuth->login('admin', 'admin') || !$initialAuth->initialAdminChangeRequired()) {
+    fwrite(STDERR, "initial admin login failed\n");
+    exit(1);
+}
+for ($i = 0; $i < 5; $i++) {
+    $initialAuth->recordInitialAdminAccess();
+}
+$initialState = $initialAuth->initialAdminState();
+if ($initialState['access_count'] !== 5 || $initialState['deadline_reached'] !== true) {
+    fwrite(STDERR, "initial admin access count failed\n");
+    exit(1);
+}
+$blocked = false;
+try {
+    $initialAuth->createUser('blocked-editor', 'Password123456', 'editor');
+} catch (Throwable) {
+    $blocked = true;
+}
+if (!$blocked) {
+    fwrite(STDERR, "initial admin user block failed\n");
+    exit(1);
+}
+$initialAuth->completeInitialAdminChange('owner', 'Password123456');
+if ($initialAuth->initialAdminChangeRequired() || !$initialAuth->login('owner', 'Password123456')) {
+    fwrite(STDERR, "initial admin completion failed\n");
+    exit(1);
+}
+$initialAuth->createUser('writer', 'Password123456', 'editor');
+$initialAuth->changePassword('writer', 'Password654321');
+if (!$initialAuth->login('writer', 'Password654321')) {
+    fwrite(STDERR, "user password change failed\n");
     exit(1);
 }
 echo "update-apply-users-ok\n";

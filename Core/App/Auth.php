@@ -6,13 +6,19 @@ namespace RepositoryCms\Core;
 
 final class Auth
 {
+    public const INITIAL_ADMIN_USERNAME = 'admin';
+    public const INITIAL_ADMIN_PASSWORD = 'admin';
+
     private const PASSWORD_MIN_LENGTH = 12;
     private const MAX_LOGIN_FAILURES = 5;
     private const LOGIN_LOCK_SECONDS = 900;
     private const SESSION_LIFETIME_SECONDS = 1800;
 
-    public function __construct(private readonly string $authFile, private readonly string $stateFile)
-    {
+    public function __construct(
+        private readonly string $authFile,
+        private readonly string $stateFile,
+        private readonly string $initialAdminStateFile,
+    ) {
         if (session_status() !== PHP_SESSION_ACTIVE) {
             ini_set('session.use_strict_mode', '1');
             ini_set('session.use_only_cookies', '1');
@@ -32,10 +38,80 @@ final class Auth
         return $this->users() !== [];
     }
 
-    public function setup(string $username, string $password): void
+    public function ensureInitialAdmin(): void
     {
         if ($this->configured()) {
-            throw new \RuntimeException('管理者は設定済みです。');
+            return;
+        }
+        $passwordHash = password_hash(self::INITIAL_ADMIN_PASSWORD, PASSWORD_DEFAULT);
+        if ($passwordHash === false) {
+            throw new \RuntimeException('初期管理者パスワードをハッシュ化できません。');
+        }
+        $this->writeUsers([[
+            'username' => self::INITIAL_ADMIN_USERNAME,
+            'password_hash' => $passwordHash,
+            'role' => 'admin',
+            'created_at' => gmdate(DATE_ATOM),
+        ]]);
+        $this->writeInitialAdminState([
+            'completed' => false,
+            'access_count' => 0,
+            'deadline_reached' => false,
+            'last_access_at' => '',
+            'updated_at' => gmdate(DATE_ATOM),
+        ]);
+    }
+
+    public function initialAdminChangeRequired(): bool
+    {
+        $this->ensureInitialAdmin();
+        return !$this->initialAdminCompleted();
+    }
+
+    public function initialAdminCompleted(): bool
+    {
+        $state = $this->readInitialAdminState();
+        return ($state['completed'] ?? false) === true;
+    }
+
+    public function recordInitialAdminAccess(): void
+    {
+        if ($this->initialAdminCompleted()) {
+            return;
+        }
+        $state = $this->readInitialAdminState();
+        $accessCount = (int) ($state['access_count'] ?? 0) + 1;
+        $this->writeInitialAdminState([
+            'completed' => false,
+            'access_count' => $accessCount,
+            'deadline_reached' => $accessCount >= 5,
+            'last_access_at' => gmdate(DATE_ATOM),
+            'updated_at' => gmdate(DATE_ATOM),
+        ]);
+    }
+
+    public function initialAdminState(): array
+    {
+        $state = $this->readInitialAdminState();
+        return [
+            'completed' => ($state['completed'] ?? false) === true,
+            'access_count' => (int) ($state['access_count'] ?? 0),
+            'deadline_reached' => ($state['deadline_reached'] ?? false) === true,
+            'last_access_at' => (string) ($state['last_access_at'] ?? ''),
+        ];
+    }
+
+    public function completeInitialAdminChange(string $username, string $password): void
+    {
+        if ($this->initialAdminCompleted()) {
+            throw new \RuntimeException('初期管理者変更は完了済みです。');
+        }
+        $username = trim($username);
+        if ($username === '' || $username === self::INITIAL_ADMIN_USERNAME) {
+            throw new \InvalidArgumentException('初期ユーザー名から変更してください。');
+        }
+        if ($password === self::INITIAL_ADMIN_PASSWORD) {
+            throw new \InvalidArgumentException('初期パスワードから変更してください。');
         }
         $this->assertPasswordAllowed($password);
         $passwordHash = password_hash($password, PASSWORD_DEFAULT);
@@ -43,15 +119,29 @@ final class Auth
             throw new \RuntimeException('パスワードをハッシュ化できません。');
         }
         $this->writeUsers([[
-            'username' => trim($username),
+            'username' => $username,
             'password_hash' => $passwordHash,
             'role' => 'admin',
             'created_at' => gmdate(DATE_ATOM),
         ]]);
+        $this->writeInitialAdminState([
+            'completed' => true,
+            'access_count' => (int) ($this->readInitialAdminState()['access_count'] ?? 0),
+            'deadline_reached' => false,
+            'last_access_at' => (string) ($this->readInitialAdminState()['last_access_at'] ?? ''),
+            'updated_at' => gmdate(DATE_ATOM),
+        ]);
+        $_SESSION['admin'] = $username;
+        $_SESSION['role'] = 'admin';
+        $_SESSION['authenticated_at'] = time();
+        $_SESSION['last_seen_at'] = time();
     }
 
     public function createUser(string $username, string $password, string $role): void
     {
+        if (!$this->initialAdminCompleted()) {
+            throw new \RuntimeException('初期管理者変更が完了するまでユーザーを設定できません。');
+        }
         $username = trim($username);
         $role = strtolower(trim($role));
         if (!in_array($role, ['admin', 'editor'], true)) {
@@ -92,6 +182,33 @@ final class Auth
             'role' => (string) $user['role'],
             'created_at' => (string) ($user['created_at'] ?? ''),
         ], $this->usersWithHashes());
+    }
+
+    public function changePassword(string $username, string $password): void
+    {
+        if (!$this->initialAdminCompleted()) {
+            throw new \RuntimeException('初期管理者変更が完了するまでパスワードを変更できません。');
+        }
+        $username = trim($username);
+        $this->assertPasswordAllowed($password);
+        $users = $this->usersWithHashes();
+        $changed = false;
+        foreach ($users as &$user) {
+            if (hash_equals((string) $user['username'], $username)) {
+                $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+                if ($passwordHash === false) {
+                    throw new \RuntimeException('パスワードをハッシュ化できません。');
+                }
+                $user['password_hash'] = $passwordHash;
+                $changed = true;
+                break;
+            }
+        }
+        unset($user);
+        if (!$changed) {
+            throw new \RuntimeException('対象ユーザーを確認できません。');
+        }
+        $this->writeUsers($users);
     }
 
     public function login(string $username, string $password): bool
@@ -341,6 +458,52 @@ final class Auth
         }
         if (!chmod($this->stateFile, 0600)) {
             throw new \RuntimeException('ログイン失敗状態の権限を設定できません。');
+        }
+    }
+
+    private function readInitialAdminState(): array
+    {
+        if (!is_file($this->initialAdminStateFile)) {
+            return $this->defaultInitialAdminState();
+        }
+        $bytes = file_get_contents($this->initialAdminStateFile);
+        if ($bytes === false) {
+            return $this->defaultInitialAdminState();
+        }
+        $data = json_decode($bytes, true);
+        if (!is_array($data)) {
+            return $this->defaultInitialAdminState();
+        }
+        return $data;
+    }
+
+    private function defaultInitialAdminState(): array
+    {
+        $users = $this->usersWithHashes();
+        if ($users === []) {
+            return ['completed' => false, 'access_count' => 0, 'deadline_reached' => false, 'last_access_at' => ''];
+        }
+        $admin = null;
+        foreach ($users as $user) {
+            if (($user['role'] ?? '') === 'admin') {
+                $admin = $user;
+                break;
+            }
+        }
+        $usesInitialCredentials = $admin !== null
+            && ($admin['username'] ?? '') === self::INITIAL_ADMIN_USERNAME
+            && password_verify(self::INITIAL_ADMIN_PASSWORD, (string) ($admin['password_hash'] ?? ''));
+        return ['completed' => !$usesInitialCredentials, 'access_count' => 0, 'deadline_reached' => false, 'last_access_at' => ''];
+    }
+
+    private function writeInitialAdminState(array $state): void
+    {
+        $payload = json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if ($payload === false || file_put_contents($this->initialAdminStateFile, $payload, LOCK_EX) === false) {
+            throw new \RuntimeException('初期管理者状態を書き込めません。');
+        }
+        if (!chmod($this->initialAdminStateFile, 0600)) {
+            throw new \RuntimeException('初期管理者状態の権限を設定できません。');
         }
     }
 }

@@ -44,7 +44,7 @@ final class Runtime
             $locks,
             $workData,
             $git,
-            new Auth($configRoot . '/auth.json', $configRoot . '/login_state.json'),
+            new Auth($configRoot . '/auth.json', $configRoot . '/login_state.json', $configRoot . '/admin_initial_state.json'),
         );
     }
 

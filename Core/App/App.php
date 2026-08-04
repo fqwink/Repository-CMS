@@ -21,12 +21,8 @@ final class App
     {
         try {
             $this->releaseMaintenanceIfReady();
+            $this->runtime->auth->ensureInitialAdmin();
             $action = (string) ($_GET['action'] ?? 'index');
-            if (!$this->runtime->auth->configured()) {
-                $this->authorize($action);
-                $this->setup();
-                return;
-            }
             if ($action === 'login') {
                 $this->authorize($action);
                 $this->login();
@@ -42,8 +38,10 @@ final class App
             }
 
             $this->runtime->auth->requireLogin();
+            $this->redirectInitialAdminChange($action);
             $this->authorize($action);
             match ($action) {
+                'initial_admin' => $this->initialAdmin(),
                 'new' => $this->edit(null),
                 'edit' => $this->edit((string) ($_GET['path'] ?? '')),
                 'save' => $this->save(),
@@ -59,6 +57,7 @@ final class App
                 'update_apply' => $this->applyUpdate(),
                 'users' => $this->users(),
                 'user_create' => $this->createUser(),
+                'user_password' => $this->changeUserPassword(),
                 default => $this->index(),
             };
         } catch (\Throwable $error) {
@@ -66,20 +65,39 @@ final class App
         }
     }
 
-    private function setup(): void
+    private function redirectInitialAdminChange(string $action): void
     {
+        if (!$this->runtime->auth->initialAdminChangeRequired()) {
+            return;
+        }
+        if (in_array($action, ['initial_admin', 'logout'], true)) {
+            return;
+        }
+        Response::redirect('?action=initial_admin');
+    }
+
+    private function initialAdmin(): void
+    {
+        if (!$this->runtime->auth->initialAdminChangeRequired()) {
+            Response::redirect('?');
+        }
         if ($this->requestMethod() === 'POST') {
             Security::requireCsrf();
             if ($this->runtime->locks->locked()) {
                 throw new \RuntimeException('CMSがロックされています。');
             }
             $username = (string) $_POST['username'];
-            $this->runtime->auth->setup((string) $_POST['username'], (string) $_POST['password']);
-            $this->audit('auth.setup', ['user' => $username]);
+            $this->runtime->auth->completeInitialAdminChange($username, (string) $_POST['password']);
+            $this->audit('auth.initial_admin_complete', ['user' => $username]);
             Response::redirect('?');
         }
-        $body = '<section class="panel"><h2>管理者設定</h2><form method="post"><input type="hidden" name="csrf" value="' . Security::csrfToken() . '"><label>ユーザー名</label><input name="username" required><label>パスワード</label><input name="password" type="password" required><p><button>作成</button></p></form></section>';
-        Response::html('管理者設定', $body, $this->runtime);
+        $state = $this->runtime->auth->initialAdminState();
+        $remaining = max(0, 5 - (int) $state['access_count']);
+        $message = $state['deadline_reached']
+            ? '<div class="alert">初期管理者変更期限に到達しています。変更完了まで他の操作はできません。</div>'
+            : '<div class="notice">初期ユーザー名と初期パスワードを変更してください。残りアクセス回数: ' . $remaining . '</div>';
+        $body = $message . '<section class="panel"><h2>初期管理者変更</h2><p class="muted">初期ユーザー名 admin と初期パスワード admin は継続利用できません。ユーザー名は一度設定すると変更できません。</p><form method="post"><input type="hidden" name="csrf" value="' . Security::csrfToken() . '"><label>新しいユーザー名</label><input name="username" required><label>新しいパスワード</label><input name="password" type="password" required><p><button>変更</button></p></form></section>';
+        Response::html('初期管理者変更', $body, $this->runtime);
     }
 
     private function login(): void
@@ -93,6 +111,9 @@ final class App
             Security::requireCsrf();
             $username = (string) $_POST['username'];
             if ($this->runtime->auth->login($username, (string) $_POST['password'])) {
+                if ($this->runtime->auth->initialAdminChangeRequired()) {
+                    $this->runtime->auth->recordInitialAdminAccess();
+                }
                 $this->audit('auth.login_success', ['user' => $username]);
                 Response::redirect('?');
             }
@@ -131,6 +152,7 @@ final class App
         $updateConfigured = $this->runtime->config->updateConfigured();
         $authState = $this->runtime->auth->user() === null ? '未認証' : '認証済み';
         $role = $this->runtime->auth->role() ?? '-';
+        $initialAdminState = $this->runtime->auth->initialAdminState();
 
         $cards = [
             ['CMS状態', $locked ? 'ロック中' : '通常稼働', $locked ? 'danger' : 'ok'],
@@ -139,6 +161,7 @@ final class App
             ['Gitプロバイダー', $gitConfigured ? '設定済み' : '未設定', $gitConfigured ? 'ok' : 'danger'],
             ['アップデート設定', $updateConfigured ? '設定済み' : '未設定', $updateConfigured ? 'ok' : 'warn'],
             ['認証状態', $authState . ' / ' . $role, $this->runtime->auth->user() === null ? 'warn' : 'ok'],
+            ['初期管理者', $initialAdminState['completed'] ? '変更済み' : '変更必須', $initialAdminState['completed'] ? 'ok' : 'warn'],
         ];
 
         $html = '<section class="dashboard-grid" aria-label="CMS状態">';
@@ -156,13 +179,14 @@ final class App
     {
         $disabledNote = $locked ? '<p class="muted">CMSロック中は、状態確認、ログアウト、アップデート状態確認以外の操作は制限されます。</p>' : '';
         $admin = $this->runtime->auth->role() === 'admin';
+        $initialDone = $this->runtime->auth->initialAdminCompleted();
         $links = [
             ['作成', '?action=new', '新しいコンテンツを作成します。', !$locked],
             ['静的生成', '?action=generate', 'コンテンツから公開成果物を生成します。', !$locked],
             ['公開', '?action=publish', '生成成果物を公開リポジトリへ保存します。', !$locked && $admin],
             ['テーマ', '?action=themes', '静的生成で使用するテーマを選択します。', !$locked && $admin],
             ['アップデート', '?action=updates', '開発元リリースを確認します。', $admin],
-            ['ユーザー', '?action=users', '管理者と編集担当を管理します。', !$locked && $admin],
+            ['ユーザー', '?action=users', '管理者と編集担当を管理します。', !$locked && $admin && $initialDone],
         ];
         $html = '<section class="panel"><div class="section-title"><h2>操作</h2><span class="badge">運用</span></div>' . $disabledNote . '<div class="action-grid">';
         foreach ($links as [$label, $href, $description, $enabled]) {
@@ -436,14 +460,18 @@ final class App
 
     private function users(): void
     {
+        if (!$this->runtime->auth->initialAdminCompleted()) {
+            throw new \RuntimeException('初期管理者変更が完了するまでユーザーを設定できません。');
+        }
         $rows = '';
         foreach ($this->runtime->auth->users() as $user) {
-            $rows .= '<tr><td>' . Response::escape((string) $user['username']) . '</td><td>' . Response::escape((string) $user['role']) . '</td><td>' . Response::escape((string) $user['created_at']) . '</td></tr>';
+            $username = (string) $user['username'];
+            $rows .= '<tr><td>' . Response::escape($username) . '</td><td>' . Response::escape((string) $user['role']) . '</td><td>' . Response::escape((string) $user['created_at']) . '</td><td><form method="post" action="?action=user_password"><input type="hidden" name="csrf" value="' . Security::csrfToken() . '"><input type="hidden" name="username" value="' . Response::escape($username) . '"><input name="password" type="password" required placeholder="新しいパスワード"><button>変更</button></form></td></tr>';
         }
         if ($rows === '') {
-            $rows = '<tr><td colspan="3" class="muted">ユーザーはありません。</td></tr>';
+            $rows = '<tr><td colspan="4" class="muted">ユーザーはありません。</td></tr>';
         }
-        $body = '<section class="panel"><h2>ユーザー</h2><p class="muted">管理者1人、編集担当2人まで作成できます。</p><table class="list"><tr><th>ユーザー名</th><th>ロール</th><th>作成日時</th></tr>' . $rows . '</table></section>'
+        $body = '<section class="panel"><h2>ユーザー</h2><p class="muted">管理者1人、編集担当2人まで作成できます。ユーザー名は一度設定すると変更できません。</p><table class="list"><tr><th>ユーザー名</th><th>ロール</th><th>作成日時</th><th>パスワード変更</th></tr>' . $rows . '</table></section>'
             . '<section class="panel"><h2>ユーザー作成</h2><form method="post" action="?action=user_create"><input type="hidden" name="csrf" value="' . Security::csrfToken() . '"><label>ユーザー名</label><input name="username" required><label>ロール</label><select name="role"><option value="editor">編集担当</option><option value="admin">管理者</option></select><label>パスワード</label><input name="password" type="password" required><p><button>作成</button></p></form></section>';
         Response::html('ユーザー', $body, $this->runtime);
     }
@@ -458,6 +486,18 @@ final class App
         $role = (string) ($_POST['role'] ?? '');
         $this->runtime->auth->createUser($username, (string) ($_POST['password'] ?? ''), $role);
         $this->audit('user.create', ['created_user' => $username, 'role' => $role, 'user' => $this->runtime->auth->user()]);
+        Response::redirect('?action=users');
+    }
+
+    private function changeUserPassword(): void
+    {
+        if ($this->requestMethod() !== 'POST') {
+            Response::redirect('?action=users');
+        }
+        Security::requireCsrf();
+        $username = (string) ($_POST['username'] ?? '');
+        $this->runtime->auth->changePassword($username, (string) ($_POST['password'] ?? ''));
+        $this->audit('user.password_change', ['target_user' => $username, 'user' => $this->runtime->auth->user()]);
         Response::redirect('?action=users');
     }
 
@@ -515,6 +555,7 @@ final class App
         return in_array($action, [
             'index',
             'login',
+            'initial_admin',
             'logout',
             'new',
             'edit',
@@ -531,6 +572,7 @@ final class App
             'update_apply',
             'users',
             'user_create',
+            'user_password',
         ], true);
     }
 
