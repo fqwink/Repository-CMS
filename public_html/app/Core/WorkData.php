@@ -39,8 +39,8 @@ final class WorkData
 
     public function cleanupAfterVerified(): void
     {
-        foreach (glob($this->workRoot . '/*') ?: [] as $path) {
-            if (!$this->deletePath($path)) {
+        foreach (new \FilesystemIterator($this->workRoot, \FilesystemIterator::SKIP_DOTS) as $item) {
+            if (!$this->deletePath($item->getPathname())) {
                 $this->locks->lock('作業データの削除に失敗しました。');
                 throw new \RuntimeException('作業データの削除に失敗しました。');
             }
@@ -53,8 +53,8 @@ final class WorkData
             return unlink($path);
         }
         if (is_dir($path)) {
-            foreach (glob($path . '/*') ?: [] as $child) {
-                if (!$this->deletePath($child)) {
+            foreach (new \FilesystemIterator($path, \FilesystemIterator::SKIP_DOTS) as $child) {
+                if (!$this->deletePath($child->getPathname())) {
                     return false;
                 }
             }

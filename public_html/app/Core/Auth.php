@@ -29,7 +29,14 @@ final class Auth
         if ($this->configured()) {
             throw new \RuntimeException('管理者は設定済みです。');
         }
-        $this->writeAuth($username, password_hash($password, PASSWORD_DEFAULT));
+        if (trim($password) === '') {
+            throw new \InvalidArgumentException('パスワードが空です。');
+        }
+        $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+        if ($passwordHash === false) {
+            throw new \RuntimeException('パスワードをハッシュ化できません。');
+        }
+        $this->writeAuth($username, $passwordHash);
     }
 
     public function login(string $username, string $password): bool
@@ -42,7 +49,10 @@ final class Auth
             return false;
         }
         $_SESSION['admin'] = $data['username'];
-        session_regenerate_id(true);
+        if (!session_regenerate_id(true)) {
+            unset($_SESSION['admin']);
+            throw new \RuntimeException('セッションIDを再生成できません。');
+        }
         return true;
     }
 
@@ -60,7 +70,9 @@ final class Auth
                 'samesite' => $params['samesite'] ?? 'Strict',
             ]);
         }
-        session_destroy();
+        if (!session_destroy()) {
+            throw new \RuntimeException('セッションを破棄できません。');
+        }
     }
 
     public function user(): ?string
@@ -80,8 +92,15 @@ final class Auth
         if (!is_file($this->authFile)) {
             return null;
         }
-        $data = json_decode((string) file_get_contents($this->authFile), true);
+        $bytes = file_get_contents($this->authFile);
+        if ($bytes === false) {
+            return null;
+        }
+        $data = json_decode($bytes, true);
         if (!is_array($data) || !isset($data['username'], $data['password_hash'])) {
+            return null;
+        }
+        if (!is_string($data['username']) || !is_string($data['password_hash'])) {
             return null;
         }
         return ['username' => (string) $data['username'], 'password_hash' => (string) $data['password_hash']];

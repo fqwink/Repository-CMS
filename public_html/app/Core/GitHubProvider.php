@@ -121,6 +121,9 @@ final class GitHubProvider implements GitProvider
         $sha = null;
         try {
             $existing = $this->request('GET', '/repos/' . $this->repo($repository) . '/contents/' . $this->encodePath($path) . '?ref=' . rawurlencode($this->config->branch));
+            if (($existing['type'] ?? '') !== 'file') {
+                throw new \RuntimeException('GitHub path already exists and is not a file.');
+            }
             $sha = (string) ($existing['sha'] ?? '');
         } catch (\RuntimeException $error) {
             if (!str_contains($error->getMessage(), ' 404 ')) {
