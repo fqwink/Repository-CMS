@@ -4,6 +4,46 @@
 
 ---
 
+## v.0.20
+
+- Master_SpecとMaster_Designの旧Core/Work/Docs表記をRepositoryCMS構成へ整理。
+- ServerSideLogicFramework設計の存在しない旧フロントサイド表記を現行App連携へ修正。
+- 実装バージョンv.0.13とドキュメント参照の整合を確認。
+
+---
+
+## v.0.19
+
+- release-checkへApp実描画テストを追加し、ダッシュボードと静的生成画面の起動退行を検出。
+- CMSとServerSideLogicFrameworkの構文、保全、アップデート、ユーザー、描画検証を再実行。
+- 追加検証込みでrelease-check-okを確認。
+
+---
+
+## v.0.18
+
+- Repository CMS本体をRepositoryCMS/配下へ移行し、Core、Modules、Work、DocsをCMS側に集約。
+- WorkをCMS部分の作業データ領域としてRepositoryCMS/Workへ固定。
+- Bootstrap、release-check、仕様、設計をRepositoryCMS構成へ追従。
+
+---
+
+## v.0.17
+
+- CMS側の認証、CSRF、ロック、RepositoryCMS/Work保全、アップデート呼び出しをserverSide窓口へ整理。
+- Runtimeの認証、ロック、WorkData実体を非公開化し、CMS本体からの直接参照を削減。
+- release-checkで分離整理後の構文、保全、アップデート、ユーザー検証を再確認。
+
+---
+
+## v.0.16
+
+- ServerSideLogicFrameworkを単一ファイル原則へ変更し、実装をServerSideLogicFramework.phpへ集約。
+- フレームワーク直下の分割PHPファイルを廃止し、Bootstrapを単一ファイル読み込みへ変更。
+- Master_SpecとMaster_Designへ単一ファイル原則とCMS側責務境界を反映。
+
+---
+
 ## v.0.15
 
 - ServerSideLogicFrameworkの別リポジトリ分割計画を廃止し、同一リポジトリ内の恒久管理へ変更。
@@ -55,7 +95,7 @@
 ## v.0.9
 
 - 事前検証済みアップデートの適用とメンテナンスモード制御を追加。
-- Core更新対象を取得、Work保全確認後にCore更新領域へ書き込む処理を追加。
+- Core更新対象を取得、RepositoryCMS/Work保全確認後にCore更新領域へ書き込む処理を追加。
 - Master_SpecとMaster_Designをv.0.9相当へ反映。
 
 ---
@@ -63,7 +103,7 @@
 ## v.0.8
 
 - アップデートリリースの任意選択と事前検証を管理画面に追加。
-- 対象バージョン、PHP要件、対象パス、禁止パス、チェックサム、Work保全状態を検証。
+- 対象バージョン、PHP要件、対象パス、禁止パス、チェックサム、RepositoryCMS/Work保全状態を検証。
 - Master_SpecとMaster_Designをv.0.8へ更新。
 
 ---
@@ -71,7 +111,7 @@
 ## v.0.7
 
 - アップデート通知と開発元リリース一覧表示を管理画面に追加。
-- Core/Data廃止、Core/App配下のLang/Themes、Core/Config保護設定領域、ルート3/Core7フォルダ原則を実装反映。
+- RepositoryCMS/Core/Data廃止、RepositoryCMS/Core/App配下のLang/Themes、RepositoryCMS/Core/Config保護設定領域、RepositoryCMS直下3/Core直下7フォルダ原則を実装反映。
 - Master_SpecとMaster_Designをv.0.7へ更新。
 
 ---
@@ -94,7 +134,7 @@
 
 ## v.0.4
 
-- ブランドカラー仕様を `Docs/Brand_Color_Spec` として分離し、読み込み対象ドキュメントに追加。
+- ブランドカラー仕様を `RepositoryCMS/Docs/Brand_Color_Spec` として分離し、読み込み対象ドキュメントに追加。
 - 管理画面をダッシュボード化し、状態確認、操作導線、コンテンツ一覧を整理。
 - Master_SpecとMaster_Designをv.0.4へ更新。
 
@@ -110,9 +150,9 @@
 
 ## v.0.2
 
-- public_htmlを廃止し、Core/app.phpをHTTP入口とする構成を実装。
-- 開発元アップデート対象をCore/app.php、Core/.htaccess、Core/App/に限定し、アップデートシステムを実装。
-- 作業データをWork/へ分離し、Master_Designをv.0.2へ更新。
+- public_htmlを廃止し、RepositoryCMS/Core/app.phpをHTTP入口とする構成を実装。
+- 開発元アップデート対象をRepositoryCMS/Core/app.php、RepositoryCMS/Core/.htaccess、RepositoryCMS/Core/App/に限定し、アップデートシステムを実装。
+- 作業データをRepositoryCMS/Work/へ分離し、Master_Designをv.0.2へ更新。
 
 ---
 
@@ -120,4 +160,4 @@
 
 - Gitプロバイダー中心の静的サイト生成CMSとして初期仕様を定義。
 - PHP 8.4以降、Web編集専用、単一管理者、外部依存最小方針を定義。
-- データ保全、許可拡張子、Core 15ファイル原則を定義。
+- データ保全、許可拡張子、Coreファイル上限原則を定義。

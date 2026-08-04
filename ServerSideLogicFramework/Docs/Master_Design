@@ -2,7 +2,7 @@
 
 # マスター設計書
 
-**Version:** v.0.5
+**Version:** v.0.6
 
 ---
 
@@ -16,26 +16,20 @@
 
 ```text
 ServerSideLogicFramework/
-  Auth.php
   Docs/
     Master_Spec
     Master_Design
     Change_History
-  LockManager.php
-  Security.php
   ServerSideLogicFramework.php
-  UpdateApplier.php
-  UpdateValidator.php
-  WorkData.php
 ```
 
-`ServerSideLogicFramework/` 直下には、サーバーサイドロジックフレームワーク関係の実装コードを配置する。
+`ServerSideLogicFramework/` 直下の実装コードは、`ServerSideLogicFramework.php` の単一ファイル原則とする。
 
-Repository CMS本体側には、サーバーサイドロジックフレームワーク関係の実装コード実体を残さない。
+Repository CMS本体側およびServerSideLogicFramework/直下の別PHPファイルには、サーバーサイドロジックフレームワーク関係の実装コード実体を残さない。
 
 別リポジトリ分割計画は廃止し、同一リポジトリ内で開発コスト削減と開発効率化を優先して管理する。
 
-Server Side Logic Framework関連ドキュメントは本フォルダで管理し、Repository CMS本体関連ドキュメントはRepository CMS本体側の `Docs/` で管理する。
+Server Side Logic Framework関連ドキュメントは本フォルダで管理し、Repository CMS本体関連ドキュメントはRepository CMS本体側の `RepositoryCMS/Docs/` で管理する。
 
 ---
 
@@ -44,14 +38,14 @@ Server Side Logic Framework関連ドキュメントは本フォルダで管理�
 Repository CMSで採用する場合の連携構造は以下とする。
 
 ```text
-Core/app.php
+RepositoryCMS/Core/app.php
   ↓
 ServerSideLogicFramework
   ↓
-Core/App/FrontSide/
+RepositoryCMS/Core/App/
 ```
 
-`Core/app.php` は単一エントリーポイントであり、フレームワークとTypeScript/JavaScript製CMSフロントサイドの連携システムを担当する。
+`RepositoryCMS/Core/app.php` は単一エントリーポイントであり、フレームワークとTypeScript/JavaScript製CMSフロントサイドの連携システムを担当する。
 
 ---
 
@@ -100,7 +94,7 @@ CMS本体機能、UI、静的生成、Gitプロバイダー連携、テーマ管
 
 # 7. 分離実装設計
 
-`ServerSideLogicFramework/` 直下にフレームワーク実装コードを配置済みとする。
+`ServerSideLogicFramework/ServerSideLogicFramework.php` にフレームワーク実装コードを集約済みとする。
 
 設計作業は `ServerSideLogicFramework/Docs/` 内で進める。
 
@@ -156,18 +150,12 @@ Out of Scopeには、APIサーバー化、JSON API、REST API、fetch前提処�
 
 分離実装後の主な成果物は以下とする。
 
-- `ServerSideLogicFramework/Auth.php`
-- `ServerSideLogicFramework/LockManager.php`
-- `ServerSideLogicFramework/Security.php`
 - `ServerSideLogicFramework/ServerSideLogicFramework.php`
-- `ServerSideLogicFramework/UpdateApplier.php`
-- `ServerSideLogicFramework/UpdateValidator.php`
-- `ServerSideLogicFramework/WorkData.php`
 - `ServerSideLogicFramework/Docs/Master_Spec`
 - `ServerSideLogicFramework/Docs/Master_Design`
 - `ServerSideLogicFramework/Docs/Change_History`
 
-Repository CMS本体側には、上記フレームワーク関係コード実体を残さない。
+フレームワーク実装コードは `ServerSideLogicFramework/ServerSideLogicFramework.php` 以外へ分散させない。
 
 ---
 
@@ -179,7 +167,7 @@ Repository CMS本体側には、上記フレームワーク関係コード実体
 
 - 変更対象
 - 責務境界
-- Core/app.phpとの連携前提
+- RepositoryCMS/Core/app.phpとの連携前提
 - 既存CMSへの影響
 - APIサーバー非採用の維持
 - Repository CMS本体側にフレームワーク関係コード実体が残っていないこと
@@ -223,35 +211,33 @@ Server Side Logic Framework安定版までの設計工程は以下とする。
 
 # 14. 分離実装設計
 
-分離実装では、以下のファイルをServer Side Logic Frameworkとする。
+分離実装では、以下の単一ファイルをServer Side Logic Frameworkとする。
 
 ```text
 ServerSideLogicFramework/
-  Auth.php
-  LockManager.php
-  Security.php
   ServerSideLogicFramework.php
-  UpdateApplier.php
-  UpdateValidator.php
-  WorkData.php
 ```
 
 Repository CMSとの連携は以下とする。
 
 ```text
-Core/App/Bootstrap.php
+RepositoryCMS/Core/App/Bootstrap.php
   ↓ autoload
-RepositoryCms\Core / ServerSideLogicFramework
+RepositoryCms\Core / ServerSideLogicFramework/ServerSideLogicFramework.php
 
-Core/App/Runtime.php
+RepositoryCMS/Core/App/Runtime.php
   ↓ holds
 ServerSideLogicFramework\ServerSideLogicFramework
 
-Core/App/App.php
+RepositoryCMS/Core/App/App.php
   ↓ delegates
 boot / requireLogin / authorize / requestMethod / csrf / update / work data
 ```
 
 フレームワークは、認証、認可、ログイン要求、CSRF、CMSロック、アップデート、作業データ保全、メンテナンス解除待機判定、HTTPメソッド判定を担当する。
+
+Repository CMS本体は、ServerSideLogicFrameworkクラスの公開メソッドを通じて安全制御を利用する。
+
+Auth、LockManager、Security、UpdateValidator、UpdateApplier、WorkDataは単一ファイル内の内部実装詳細として扱い、CMS本体から直接呼び出さない。
 
 フレームワークはAPIサーバーとして動作しない。

@@ -8,7 +8,9 @@
 
 # 1. 設計目的
 
-本設計書は、`Docs/Master_Spec` v.0.11 の累積開発計画 v.0.13 までに基づく Repository CMS の実装構造を簡潔にまとめる。
+本設計書は、`RepositoryCMS/Docs/Master_Spec` v.0.13 の累積開発計画 v.0.13 までに基づく Repository CMS の実装構造を簡潔にまとめる。
+
+現時点の実装バージョンは `RepositoryCMS/Core/App/Config.php` の `Config::VERSION` に定義された `v.0.13` とする。
 
 仕様・設計・実装は同一バージョンで管理する。
 
@@ -18,14 +20,14 @@
 
 - PHP 8.4以降で実装する
 - 外部依存は追加しない
-- HTTPエントリーポイントは `Core/app.php` のみとする
-- CMS本体コードは `Core/App/` に集約する
+- HTTPエントリーポイントは `RepositoryCMS/Core/app.php` のみとする
+- CMS本体コードは `RepositoryCMS/Core/App/` に集約する
 - 管理者1人、編集担当2人の認証・認可をCoreで管理する
-- 管理画面は `Docs/Brand_Color_Spec` に基づくブランドカラーを固定で使用する
-- 標準テーマ3個を `Core/App/Themes/` の開発元管理ソースとして管理する
-- 多言語化データは `Core/App/Lang/` の開発元管理データとして管理する
-- 保護設定は `Core/Config/` 直下ファイルとして管理する
-- 作業データは `Work/` に保存し、保全確認後に削除する
+- 管理画面は `RepositoryCMS/Docs/Brand_Color_Spec` に基づくブランドカラーを固定で使用する
+- 標準テーマ3個を `RepositoryCMS/Core/App/Themes/` の開発元管理ソースとして管理する
+- 多言語化データは `RepositoryCMS/Core/App/Lang/` の開発元管理データとして管理する
+- 保護設定は `RepositoryCMS/Core/Config/` 直下ファイルとして管理する
+- 作業データは `RepositoryCMS/Work/` に保存し、保全確認後に削除する
 - ローカルGitリポジトリは保持しない
 - Git操作はGitプロバイダーAPIを通じて行う
 - v.0.12とv.0.13は新機能追加を行わず、既存実装範囲のバグ修正・安定化を対象とする
@@ -35,31 +37,36 @@
 # 3. ディレクトリ構成
 
 ```text
-Core/
-  app.php
-  .htaccess
-  App/
-    Lang/
-    Themes/
-  Config/
+RepositoryCMS/
+  Core/
+    app.php
+    .htaccess
+    App/
+      Lang/
+      Themes/
+    Config/
+  Modules/
+  Work/
+  Docs/
 ServerSideLogicFramework/
   Docs/
-Modules/
-Work/
-Docs/
 ```
 
 `public_html/` は採用しない。
 
-ルート直下のRepository CMS本体カウント対象フォルダは `Core/`、`Modules/`、`Work/` の最大3フォルダとし、`Docs/` と `ServerSideLogicFramework/` はカウント対象外とする。
+リポジトリルート直下は `RepositoryCMS/` と `ServerSideLogicFramework/` の2系統を基本とする。
+
+Repository CMS本体は `RepositoryCMS/` で管理し、CMS本体カウント対象フォルダは `RepositoryCMS/Core/`、`RepositoryCMS/Modules/`、`RepositoryCMS/Work/` の最大3フォルダとする。
+
+`RepositoryCMS/Docs/` はCMS本体ドキュメント領域であり、CMS本体カウント対象外とする。
 
 `ServerSideLogicFramework/` はRepository CMS本体とは別責務の並行開発領域とし、同一リポジトリ内で恒久管理する。
 
 別リポジトリ分割計画は、開発コスト削減と開発効率化を優先するため廃止する。
 
-Core直下フォルダは最大7フォルダとし、現行方針では `App/`、`Config/` の2フォルダとする。
+`RepositoryCMS/Core/` 直下フォルダは最大7フォルダとし、現行方針では `App/`、`Config/` の2フォルダとする。
 
-`Core/app.php` 以外への直接HTTPアクセスは禁止する。
+`RepositoryCMS/Core/app.php` 以外への直接HTTPアクセスは禁止する。
 
 ---
 
@@ -73,22 +80,16 @@ Core直下フォルダは最大7フォルダとし、現行方針では `App/`�
 - `ServerSideLogicFramework/Docs/Master_Design`
 - `ServerSideLogicFramework/Docs/Change_History`
 
-`ServerSideLogicFramework/` 直下は、サーバーサイドロジックフレームワーク関係の実装コードを配置対象とする。
+`ServerSideLogicFramework/` 直下の実装コードは単一ファイル原則とする。
 
 - `ServerSideLogicFramework.php`
-- `Auth.php`
-- `LockManager.php`
-- `Security.php`
-- `UpdateApplier.php`
-- `UpdateValidator.php`
-- `WorkData.php`
 - `Docs/`
 
-Repository CMS本体側には、サーバーサイドロジックフレームワーク関係の実装コード実体を残さない。
+Repository CMS本体側およびServerSideLogicFramework/直下の別PHPファイルには、サーバーサイドロジックフレームワーク関係の実装コード実体を残さない。
 
-Repository CMS本体の `Docs/` とフレームワークの `ServerSideLogicFramework/Docs/` は分離して管理する。
+Repository CMS本体の `RepositoryCMS/Docs/` とフレームワークの `ServerSideLogicFramework/Docs/` は分離して管理する。
 
-Repository CMS本体に関する仕様、設計、変更履歴は `Docs/` に集約する。
+Repository CMS本体に関する仕様、設計、変更履歴は `RepositoryCMS/Docs/` に集約する。
 
 Server Side Logic Frameworkに関する仕様、設計、変更履歴は `ServerSideLogicFramework/Docs/` に集約する。
 
@@ -99,32 +100,36 @@ Repository CMSは、フレームワーク仕様および機能に準拠して開
 採用時の連携構造は以下とする。
 
 ```text
-Core/app.php
+RepositoryCMS/Core/app.php
   ↓
 ServerSideLogicFramework/
   ↓
-Core/App/
+RepositoryCMS/Core/App/
 ```
 
-`Core/app.php` は単一エントリーポイントであり、サーバーサイドロジックフレームワークとTypeScript/JavaScript製CMSフロントサイドの連携システムとして扱う。
+`RepositoryCMS/Core/app.php` は単一エントリーポイントであり、サーバーサイドロジックフレームワークとTypeScript/JavaScript製CMSフロントサイドの連携システムとして扱う。
 
 分離実装の連携構造は以下とする。
 
 ```text
-Core/app.php
+RepositoryCMS/Core/app.php
   ↓
-Core/App/Bootstrap.php
+RepositoryCMS/Core/App/Bootstrap.php
   ↓
 ServerSideLogicFramework/ServerSideLogicFramework.php
   ↓
-Core/App/Runtime.php
+RepositoryCMS/Core/App/Runtime.php
   ↓
-Core/App/App.php
+RepositoryCMS/Core/App/App.php
 ```
 
 `Bootstrap` はRepository CMS本体とServerSideLogicFrameworkのオートロードを担当する。
 
-`Runtime` は `ServerSideLogicFramework` と関連クラスを保持し、`App` は認証、認可、CSRF、ログイン要求、メンテナンス解除待機判定、HTTPメソッド判定、アップデート適用、作業データ保全をフレームワーク側へ委譲する。
+`Runtime` は `ServerSideLogicFramework.php` 内のフレームワーククラスを保持し、`App` は認証、認可、CSRF、ログイン要求、メンテナンス解除待機判定、HTTPメソッド判定、アップデート適用、作業データ保全をフレームワーク側へ委譲する。
+
+`App`、`ContentManager`、`Renderer`、`StaticGenerator`、`Response` は、認証、認可、CSRF、ロック状態、入力検証、作業データ保全、アップデート検証・適用を `Runtime::$serverSide` 経由で利用する。
+
+`Runtime` は認証、ロック、作業データ保全の実体を生成して `ServerSideLogicFramework` へ渡すが、CMS本体向けの公開プロパティとしては露出しない。
 
 当面の設計優先順位は以下とする。
 
@@ -157,16 +162,16 @@ Repository CMS
 # 5. 起動構造
 
 ```text
-Core/app.php
+RepositoryCMS/Core/app.php
   ↓
-Core/App/Bootstrap.php
+RepositoryCMS/Core/App/Bootstrap.php
   ↓
-Core/App/Runtime.php
+RepositoryCMS/Core/App/Runtime.php
   ↓
-Core/App/App.php
+RepositoryCMS/Core/App/App.php
 ```
 
-`Core/app.php` は唯一のHTTP制御点である。
+`RepositoryCMS/Core/app.php` は唯一のHTTP制御点である。
 
 ---
 
@@ -174,64 +179,64 @@ Core/App/App.php
 
 Core更新領域は以下とする。
 
-- `Core/app.php`
-- `Core/.htaccess`
-- `Core/App/`
+- `RepositoryCMS/Core/app.php`
+- `RepositoryCMS/Core/.htaccess`
+- `RepositoryCMS/Core/App/`
 
-`Core/App/Lang/` と `Core/App/Themes/` は `Core/App/` の一部として開発元更新領域に含める。
+アップデートリリースのマニフェストパスはCMSルート相対とし、`Core/app.php`、`Core/.htaccess`、`Core/App/` を使う。
 
-`Core/Config/` は保護設定領域であり、アップデート時に上書き、削除、初期化しない。
+`RepositoryCMS/Core/App/Lang/` と `RepositoryCMS/Core/App/Themes/` は `RepositoryCMS/Core/App/` の一部として開発元更新領域に含める。
 
-`Core/Data/` は廃止する。
+`RepositoryCMS/Core/Config/` は保護設定領域であり、アップデート時に上書き、削除、初期化しない。
 
-`Core/App/` のPHPファイル数は最大23ファイルまでとする。
+`RepositoryCMS/Core/Data/` は廃止する。
 
-現時点の `Core/App/` は以下の17 PHPファイルで構成する。
+`RepositoryCMS/Core/App/` のPHPファイル数は最大23ファイルまでとする。
+
+現時点の `RepositoryCMS/Core/App/` は以下の11 PHPファイルで構成する。
 
 | ファイル | 責務 |
 | --- | --- |
 | `App.php` | HTTPリクエスト制御、画面遷移、操作呼び出し |
-| `Auth.php` | 管理者、編集担当の認証、セッション管理 |
 | `Bootstrap.php` | 起動処理、オートロード |
 | `Config.php` | バージョン、環境変数設定 |
 | `ContentManager.php` | コンテンツ取得、保存、履歴、復元 |
 | `GitHubProvider.php` | GitHub API連携 |
 | `GitProvider.php` | Gitプロバイダーインターフェース |
-| `LockManager.php` | CMSロック状態管理 |
 | `NullGitProvider.php` | Git未設定時の安全側実装 |
 | `Renderer.php` | プレビュー、Markdown簡易変換 |
 | `Response.php` | HTMLレスポンス、リダイレクト、エスケープ |
 | `Runtime.php` | 実行時依存の生成と共有 |
-| `Security.php` | パス検証、拡張子検証、CSRF、内容検証 |
 | `StaticGenerator.php` | 静的生成、公開成果物生成 |
-| `UpdateApplier.php` | アップデート適用、メンテナンス状態、失敗時ロック |
-| `UpdateValidator.php` | アップデートリリースの選択後事前検証 |
-| `WorkData.php` | 作業データ作成、チェックサム、削除 |
 
-`Core/App/` の開発元管理リソースは以下とする。
+認証、認可、CMSロック、CSRF、アップデート、作業データ保全は `ServerSideLogicFramework/ServerSideLogicFramework.php` へ集約する。
 
-- `Core/App/Lang/ja.json`
-- `Core/App/Themes/standard.json`
-- `Core/App/Themes/blog.json`
-- `Core/App/Themes/media.json`
-- `Core/App/release-check.sh`
+CMS本体コードは、フレームワーク内部の `Auth`、`LockManager`、`WorkData`、`Security`、`UpdateValidator`、`UpdateApplier` を直接呼び出さない。
+
+`RepositoryCMS/Core/App/` の開発元管理リソースは以下とする。
+
+- `RepositoryCMS/Core/App/Lang/ja.json`
+- `RepositoryCMS/Core/App/Themes/standard.json`
+- `RepositoryCMS/Core/App/Themes/blog.json`
+- `RepositoryCMS/Core/App/Themes/media.json`
+- `RepositoryCMS/Core/App/release-check.sh`
 
 ---
 
 # 7. 設定領域
 
-`Core/Config/` は作業データを含まない保護設定領域とする。
+`RepositoryCMS/Core/Config/` は作業データを含まない保護設定領域とする。
 
 主な保存先は以下とする。
 
-- 認証情報: `Core/Config/auth.json`
-- ログイン失敗状態: `Core/Config/login_state.json`
-- 初期管理者状態: `Core/Config/admin_initial_state.json`
-- CMSロック情報: `Core/Config/cms_lock.json`
-- CMS状態: `Core/Config/cms_state.json`
-- ユーザーテーマ設定: `Core/Config/theme.json`
+- 認証情報: `RepositoryCMS/Core/Config/auth.json`
+- ログイン失敗状態: `RepositoryCMS/Core/Config/login_state.json`
+- 初期管理者状態: `RepositoryCMS/Core/Config/admin_initial_state.json`
+- CMSロック情報: `RepositoryCMS/Core/Config/cms_lock.json`
+- CMS状態: `RepositoryCMS/Core/Config/cms_state.json`
+- ユーザーテーマ設定: `RepositoryCMS/Core/Config/theme.json`
 
-`Core/Config/` の方針は以下とする。
+`RepositoryCMS/Core/Config/` の方針は以下とする。
 
 - 直下ファイルのみを配置する
 - サブフォルダを作成しない
@@ -239,21 +244,21 @@ Core更新領域は以下とする。
 - 認証情報、状態情報、ユーザーテーマ設定を保存する
 - 作業データを置かない
 
-`Core/App/Lang/` は開発元管理の多言語化データ領域とし、アップデート時に上書きされる。
+`RepositoryCMS/Core/App/Lang/` は開発元管理の多言語化データ領域とし、アップデート時に上書きされる。
 
-`Core/App/Themes/` は開発元管理のテーマ関連ソースコード領域とし、アップデート時に上書きされる。
+`RepositoryCMS/Core/App/Themes/` は開発元管理のテーマ関連ソースコード領域とし、アップデート時に上書きされる。
 
-標準テーマ3個は `Core/App/Themes/*.json` から読み込む。
+標準テーマ3個は `RepositoryCMS/Core/App/Themes/*.json` から読み込む。
 
-ユーザーは `Core/App/Themes/` のテーマ関連ソースコードを修正・カスタマイズできない。
+ユーザーは `RepositoryCMS/Core/App/Themes/` のテーマ関連ソースコードを修正・カスタマイズできない。
 
-`Core/Data/` は廃止し、作成・維持しない。
+`RepositoryCMS/Core/Data/` は廃止し、作成・維持しない。
 
 ---
 
 # 8. 作業データ領域
 
-作業データの保存場所は `Work/` とする。
+作業データの保存場所は `RepositoryCMS/Work/` とする。
 
 用途は以下とする。
 
@@ -312,11 +317,11 @@ Gitプロバイダー設定が不足する場合、CMSはロック状態にな�
 - 認証情報はGit管理しない
 - 認証履歴はCMSサーバ運用リポジトリへ記録する
 
-認証情報は `Core/Config/auth.json` に保存する。
+認証情報は `RepositoryCMS/Core/Config/auth.json` に保存する。
 
-ログイン失敗状態は `Core/Config/login_state.json` に保存する。
+ログイン失敗状態は `RepositoryCMS/Core/Config/login_state.json` に保存する。
 
-初期管理者状態は `Core/Config/admin_initial_state.json` に保存する。
+初期管理者状態は `RepositoryCMS/Core/Config/admin_initial_state.json` に保存する。
 
 初期管理者アカウントは以下とする。
 
@@ -395,7 +400,7 @@ JPEG系を含むその他形式は扱わない。
 ```text
 入力検証
   ↓
-Work/へ作業データ作成
+RepositoryCMS/Work/へ作業データ作成
   ↓
 作業データチェックサム確認
   ↓
@@ -405,12 +410,12 @@ Gitプロバイダーから再取得
   ↓
 チェックサム一致確認
   ↓
-Work/の作業データ削除
+RepositoryCMS/Work/の作業データ削除
 ```
 
 保全不能、整合性不明、保全状態不明の場合はCMS全体をロックする。
 
-保存処理でGitプロバイダー保存、再取得、チェックサム確認のいずれかに失敗した場合もCMS全体をロックし、作成済みの `Work/` 作業データを削除する。
+保存処理でGitプロバイダー保存、再取得、チェックサム確認のいずれかに失敗した場合もCMS全体をロックし、作成済みの `RepositoryCMS/Work/` 作業データを削除する。
 
 ---
 
@@ -454,7 +459,7 @@ CMSロック中は状態確認画面を優先して表示し、許可されな�
 
 # 15. 静的生成・公開設計
 
-静的生成はコンテンツデータをもとに `Work/` 上の作業データとして生成する。
+静的生成はコンテンツデータをもとに `RepositoryCMS/Work/` 上の作業データとして生成する。
 
 生成対象は以下とする。
 
@@ -488,7 +493,7 @@ v.0.5では、静的生成と公開は生成レポートを返す。
 - 出力パスは公開パスとして検証する
 - チェックサムはSHA-256として検証する
 
-生成後、`Work/` の作業データは保全確認後に削除する。
+生成後、`RepositoryCMS/Work/` の作業データは保全確認後に削除する。
 
 作業データ削除不能、削除状態不明、生成結果不明、公開後の再取得チェックサム不一致の場合はCMS全体をロックする。
 
@@ -500,7 +505,7 @@ v.0.6では、静的生成時に有効テーマを適用する。
 - `blog`
 - `media`
 
-有効テーマは `Core/Config/theme.json` に保存する。
+有効テーマは `RepositoryCMS/Core/Config/theme.json` に保存する。
 
 テーマ設定は保存後に再取得し、チェックサムと内容の整合性を確認する。
 
@@ -508,27 +513,29 @@ v.0.6では、静的生成時に有効テーマを適用する。
 
 管理画面のテーマ管理では、有効テーマを1個だけ選択できる。
 
-公開テーマは `Docs/Brand_Color_Spec` のブランドカラートークンを反映する。
+公開テーマは `RepositoryCMS/Docs/Brand_Color_Spec` のブランドカラートークンを反映する。
 
 ---
 
 # 16. アップデート設計
 
-アップデートシステムは `Core/App/` に組み込む。
+アップデートシステムは `RepositoryCMS/Core/App/` に組み込む。
 
 開発元アップデート対象は以下のみとする。
 
-- `Core/app.php`
-- `Core/.htaccess`
-- `Core/App/`
+- `RepositoryCMS/Core/app.php`
+- `RepositoryCMS/Core/.htaccess`
+- `RepositoryCMS/Core/App/`
 
-`Core/App/Lang/` と `Core/App/Themes/` は `Core/App/` の一部としてアップデート対象に含める。
+アップデートリリースのマニフェストパスはCMSルート相対とし、`Core/app.php`、`Core/.htaccess`、`Core/App/` を使う。
 
-`Core/Config/`、`Core/Data/`、`Modules/`、`Work/`、`Docs/` はアップデート対象外とする。
+`RepositoryCMS/Core/App/Lang/` と `RepositoryCMS/Core/App/Themes/` は `RepositoryCMS/Core/App/` の一部としてアップデート対象に含める。
 
-`Core/Config/` 内の認証情報、ログイン失敗状態、CMSロック状態、CMS状態、ユーザーテーマ設定はアップデート時に上書き、削除、初期化しない。
+`RepositoryCMS/Core/Config/`、`RepositoryCMS/Core/Data/`、`RepositoryCMS/Modules/`、`RepositoryCMS/Work/`、`RepositoryCMS/Docs/` はアップデート対象外とする。
 
-Core直下、`Core/App/`、`Core/Config/` に作業データ用フォルダを作成・維持しない。
+`RepositoryCMS/Core/Config/` 内の認証情報、ログイン失敗状態、CMSロック状態、CMS状態、ユーザーテーマ設定はアップデート時に上書き、削除、初期化しない。
+
+`RepositoryCMS/Core/` 直下、`RepositoryCMS/Core/App/`、`RepositoryCMS/Core/Config/` に作業データ用フォルダを作成・維持しない。
 
 アップデートリリース一覧は開発元リポジトリの `updates/releases.json` から取得する。
 
@@ -569,17 +576,17 @@ v.0.8の事前検証は以下を確認する。
 - 対象パス
 - 取得元パス
 - Coreファイルチェックサム
-- Core/App PHPファイル数
+- RepositoryCMS/Core/App PHPファイル数
 - 禁止パス
-- Work/ の保全状態
+- RepositoryCMS/Work/ の保全状態
 
 v.0.8では、アップデート適用、メンテナンスモード切り替え、Core更新ファイルの書き込みは行わない。
 
 v.0.9では、事前検証に成功したアップデートを管理者が適用できる。
 
-適用時はメンテナンスモードへ切り替え、PHPバージョン、対象バージョン、対象パス、チェックサム、`Work/` の保全状態を検証する。
+適用時はメンテナンスモードへ切り替え、PHPバージョン、対象バージョン、対象パス、チェックサム、`RepositoryCMS/Work/` の保全状態を検証する。
 
-更新ファイルは `Work/` に保存し、チェックサム確認後に `Core/app.php`、`Core/.htaccess`、`Core/App/` へ書き込む。
+更新ファイルは `RepositoryCMS/Work/` に保存し、チェックサム確認後に `RepositoryCMS/Core/app.php`、`RepositoryCMS/Core/.htaccess`、`RepositoryCMS/Core/App/` へ書き込む。
 
 v.0.10では、適用後の再読み取りチェックサム確認、失敗時CMSロック、作業データ削除、メンテナンス解除待機を行う。
 
@@ -598,17 +605,18 @@ v.0.12とv.0.13は、新機能追加を行わないバグ修正・安定化リ�
 安定化確認は以下を対象とする。
 
 - PHP構文確認
-- `Core/App/release-check.sh` の検証結果
+- `RepositoryCMS/Core/App/release-check.sh` の検証結果
 - 認証・認可の操作制限
 - アップデート通知、事前検証、適用、失敗時ロック、5分後復帰待機
-- `Work/` 作業データの保全確認と削除
-- `Core/Config/` 保護設定領域の非更新
-- `Core/Data/` 廃止状態
-- ルート直下3フォルダ原則
-- Core直下7フォルダ原則
-- `Core/App/` PHPファイル数最大23ファイル原則
+- `RepositoryCMS/Work/` 作業データの保全確認と削除
+- `RepositoryCMS/Core/Config/` 保護設定領域の非更新
+- `RepositoryCMS/Core/Data/` 廃止状態
+- リポジトリルート直下2系統原則
+- RepositoryCMS直下3フォルダ原則
+- RepositoryCMS/Core直下7フォルダ原則
+- `RepositoryCMS/Core/App/` PHPファイル数最大23ファイル原則
 
-不具合が見つかった場合のみ、`Docs/Master_Spec` と本設計書の範囲内で修正する。
+不具合が見つかった場合のみ、`RepositoryCMS/Docs/Master_Spec` と本設計書の範囲内で修正する。
 
 仕様変更、設計変更、新機能追加が必要な場合は、実装を止め、承認フローに戻す。
 
@@ -620,14 +628,14 @@ Modulesは開発元公認セカンドパーティー専用とする。
 
 現時点では実装モジュールを持たない。
 
-Modulesは `Core/app.php` 経由でのみ実行される。
+RepositoryCMS/Modulesは `RepositoryCMS/Core/app.php` 経由でのみ実行される。
 
-ModulesからCoreへの直接アクセスは禁止する。
+RepositoryCMS/ModulesからRepositoryCMS/Coreへの直接アクセスは禁止する。
 
 ---
 
 # 19. 将来機能
 
-`Docs/Master_Spec` に将来機能として記載された機能は初期版では実装しない。
+`RepositoryCMS/Docs/Master_Spec` に将来機能として記載された機能は初期版では実装しない。
 
-将来機能を開発する場合は、先に `Docs/Master_Spec` へ仕様を明記し、承認後に設計・実装する。
+将来機能を開発する場合は、先に `RepositoryCMS/Docs/Master_Spec` へ仕様を明記し、承認後に設計・実装する。

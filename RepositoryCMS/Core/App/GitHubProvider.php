@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace RepositoryCms\Core;
 
 use ServerSideLogicFramework\LockManager;
-use ServerSideLogicFramework\Security;
+use ServerSideLogicFramework\ServerSideLogicFramework;
 
 final class GitHubProvider implements GitProvider
 {
@@ -36,7 +36,7 @@ final class GitHubProvider implements GitProvider
         $items = [];
         foreach (($tree['tree'] ?? []) as $node) {
             $path = (string) ($node['path'] ?? '');
-            if (($node['type'] ?? '') === 'blob' && Security::validContentPath($path)) {
+            if (($node['type'] ?? '') === 'blob' && ServerSideLogicFramework::validContentPathStatic($path)) {
                 $items[] = ['path' => $path, 'size' => (int) ($node['size'] ?? 0)];
             }
         }
@@ -125,7 +125,7 @@ final class GitHubProvider implements GitProvider
         if (!$this->config->updateConfigured()) {
             throw new \RuntimeException('開発元アップデートリポジトリが未設定です。');
         }
-        if (!Security::validRepositoryPath($path)) {
+        if (!ServerSideLogicFramework::validRepositoryPathStatic($path)) {
             throw new \InvalidArgumentException('アップデートファイルパスが不正です。');
         }
         $data = $this->request('GET', '/repos/' . $this->repo($this->config->updateRepository) . '/contents/' . $this->encodePath($path) . '?ref=' . rawurlencode($this->config->updateBranch));
@@ -235,14 +235,14 @@ final class GitHubProvider implements GitProvider
 
     private function assertContentPath(string $path): void
     {
-        if (!Security::validContentPath($path)) {
+        if (!ServerSideLogicFramework::validContentPathStatic($path)) {
             throw new \InvalidArgumentException('コンテンツパスが不正です。');
         }
     }
 
     private function assertPublicPath(string $path): void
     {
-        if (!Security::validPublicPath($path)) {
+        if (!ServerSideLogicFramework::validPublicPathStatic($path)) {
             throw new \InvalidArgumentException('公開パスが不正です。');
         }
     }

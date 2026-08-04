@@ -4,6 +4,38 @@
 
 ---
 
+## v.0.9
+
+- Master_Designの存在しない旧フロントサイド表記を現行RepositoryCMS/Core/App連携へ修正。
+- CMS本体ドキュメントのRepositoryCMS構成追従と整合するよう連携説明を確認。
+- フレームワーク単一ファイル原則とAPI非採用方針は維持。
+
+---
+
+## v.0.8
+
+- Repository CMS本体をRepositoryCMS/配下管理へ変更した構成に追従。
+- フレームワークはルート直下管理を維持し、CMS連携パスをRepositoryCMS/Coreへ整理。
+- CMS側DocsとFramework側Docsの分離管理を継続。
+
+---
+
+## v.0.7
+
+- CMS本体からの安全制御利用をServerSideLogicFramework公開窓口経由へ整理。
+- 認証、CSRF、ロック、Work保全、アップデート検証・適用の委譲メソッドを追加。
+- Runtime上の認証、ロック、WorkData実体をCMS本体向け公開プロパティから外した。
+
+---
+
+## v.0.6
+
+- ServerSideLogicFrameworkを単一ファイル原則へ変更し、実装をServerSideLogicFramework.phpへ集約。
+- Auth、LockManager、Security、UpdateApplier、UpdateValidator、WorkDataの分割ファイルを廃止。
+- Bootstrapのフレームワーク読み込みを単一ファイル前提へ変更。
+
+---
+
 ## v.0.5
 
 - 別リポジトリ分割計画を廃止し、同一リポジトリ内で恒久管理する方針へ変更。

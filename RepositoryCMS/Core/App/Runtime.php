@@ -17,10 +17,10 @@ final class Runtime
         public readonly string $configRoot,
         public readonly string $workRoot,
         public readonly Config $config,
-        public readonly LockManager $locks,
-        public readonly WorkData $workData,
+        private readonly LockManager $locks,
+        private readonly WorkData $workData,
         public readonly GitProvider $git,
-        public readonly Auth $auth,
+        private readonly Auth $auth,
         public readonly ServerSideLogicFramework $serverSide,
     ) {
     }
@@ -53,7 +53,7 @@ final class Runtime
             $workData,
             $git,
             $auth,
-            new ServerSideLogicFramework($auth, $locks),
+            new ServerSideLogicFramework($auth, $locks, $workData),
         );
     }
 

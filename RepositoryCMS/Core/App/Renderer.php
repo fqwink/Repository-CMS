@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace RepositoryCms\Core;
 
-use ServerSideLogicFramework\Security;
+use ServerSideLogicFramework\ServerSideLogicFramework;
 
 final class Renderer
 {
+    public function __construct(private readonly ServerSideLogicFramework $serverSide)
+    {
+    }
+
     public function preview(string $path, string $bytes): string
     {
-        Security::validateContent($path, $bytes);
-        return match (Security::allowedExtension($path)) {
+        $this->serverSide->validateContent($path, $bytes);
+        return match ($this->serverSide->allowedExtension($path)) {
             'md' => $this->markdown($bytes),
             'json' => '<pre>' . Response::escape($this->json($bytes)) . '</pre>',
             'svg' => '<pre>' . Response::escape($bytes) . '</pre>',

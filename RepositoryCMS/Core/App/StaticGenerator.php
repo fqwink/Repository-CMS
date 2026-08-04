@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace RepositoryCms\Core;
 
-use ServerSideLogicFramework\Security;
-
 final class StaticGenerator
 {
     private const THEME_NAMES = ['standard', 'blog', 'media'];
@@ -64,7 +62,7 @@ final class StaticGenerator
 
     public function publishReport(): array
     {
-        if ($this->runtime->locks->locked()) {
+        if ($this->runtime->serverSide->locked()) {
             throw new \RuntimeException('CMSがロックされています。');
         }
         return $this->processOutputs(true);
@@ -72,7 +70,7 @@ final class StaticGenerator
 
     private function processOutputs(bool $publish): array
     {
-        if ($this->runtime->locks->locked()) {
+        if ($this->runtime->serverSide->locked()) {
             throw new \RuntimeException('CMSがロックされています。');
         }
         $report = [
@@ -89,18 +87,18 @@ final class StaticGenerator
             $report['total']++;
             try {
                 $output = $this->buildOutput($sourcePath, $theme);
-                $checksum = $this->runtime->workData->checksum($output['bytes']);
+                $checksum = $this->runtime->serverSide->checksum($output['bytes']);
                 $this->validateGeneratedOutput($output['path'], $output['bytes'], $checksum);
-                $workPath = $this->runtime->workData->write(basename($output['path']), $output['bytes']);
-                if (!$this->runtime->workData->verified($workPath, $checksum)) {
-                    $this->runtime->locks->lock('静的生成作業データのチェックサムが一致しません。');
+                $workPath = $this->runtime->serverSide->writeWorkData(basename($output['path']), $output['bytes']);
+                if (!$this->runtime->serverSide->verifyWorkData($workPath, $checksum)) {
+                    $this->runtime->serverSide->lock('静的生成作業データのチェックサムが一致しません。');
                     throw new \RuntimeException('静的生成作業データの保全確認に失敗しました。');
                 }
                 if ($publish) {
                     $this->runtime->git->savePublicContent($output['path'], $output['bytes'], 'Repository CMS publish: ' . $output['path']);
                     $fetched = $this->runtime->git->readPublicContent($output['path']);
-                    if (!hash_equals($checksum, $this->runtime->workData->checksum($fetched))) {
-                        $this->runtime->locks->lock('公開後の再取得チェックサムが一致しません。');
+                    if (!hash_equals($checksum, $this->runtime->serverSide->checksum($fetched))) {
+                        $this->runtime->serverSide->lock('公開後の再取得チェックサムが一致しません。');
                         throw new \RuntimeException('公開成果物の保全確認に失敗しました。');
                     }
                 }
@@ -127,9 +125,9 @@ final class StaticGenerator
         }
 
         try {
-            $this->runtime->workData->cleanupAfterVerified();
+            $this->runtime->serverSide->cleanupWorkData();
         } catch (\Throwable $error) {
-            $this->runtime->locks->lock('静的生成作業データの削除に失敗しました。');
+            $this->runtime->serverSide->lock('静的生成作業データの削除に失敗しました。');
             throw $error;
         }
 
@@ -138,12 +136,12 @@ final class StaticGenerator
 
     private function buildOutput(string $path, array $theme): array
     {
-        if (!Security::validContentPath($path)) {
+        if (!$this->runtime->serverSide->validContentPath($path)) {
             throw new \InvalidArgumentException('コンテンツパスが不正です。');
         }
         $bytes = $this->runtime->git->readContent($path);
-        Security::validateContent($path, $bytes);
-        $extension = Security::allowedExtension($path);
+        $this->runtime->serverSide->validateContent($path, $bytes);
+        $extension = $this->runtime->serverSide->allowedExtension($path);
         if ($extension === 'md') {
             $target = preg_replace('/\.md$/', '.html', $path);
             if (!is_string($target) || $target === '') {
@@ -168,13 +166,13 @@ final class StaticGenerator
         }
         $bytes = file_get_contents($path);
         if ($bytes === false) {
-            $this->runtime->locks->lock('テーマ設定を読み取れません。');
+            $this->runtime->serverSide->lock('テーマ設定を読み取れません。');
             throw new \RuntimeException('テーマ設定を読み取れません。');
         }
         $data = json_decode($bytes, true);
         $theme = is_array($data) ? (string) ($data['active_theme'] ?? '') : '';
         if (!self::validTheme($theme)) {
-            $this->runtime->locks->lock('有効テーマが不正です。');
+            $this->runtime->serverSide->lock('有効テーマが不正です。');
             throw new \RuntimeException('有効テーマが不正です。');
         }
         return $theme;
@@ -184,7 +182,7 @@ final class StaticGenerator
     {
         $theme = self::themes()[$this->activeThemeName()] ?? null;
         if (!is_array($theme) || !$this->validThemeDefinition($theme)) {
-            $this->runtime->locks->lock('テーマを検証できません。');
+            $this->runtime->serverSide->lock('テーマを検証できません。');
             throw new \RuntimeException('テーマを検証できません。');
         }
         return $theme;
@@ -225,18 +223,18 @@ final class StaticGenerator
 
     private function validateGeneratedOutput(string $path, string $bytes, string $checksum): void
     {
-        if (!Security::validPublicPath($path)) {
-            $this->runtime->locks->lock('静的生成出力パスが不正です。');
+        if (!$this->runtime->serverSide->validPublicPath($path)) {
+            $this->runtime->serverSide->lock('静的生成出力パスが不正です。');
             throw new \RuntimeException('静的生成出力パスが不正です。');
         }
         if (!preg_match('/^[a-f0-9]{64}$/', $checksum)) {
-            $this->runtime->locks->lock('静的生成チェックサムが不正です。');
+            $this->runtime->serverSide->lock('静的生成チェックサムが不正です。');
             throw new \RuntimeException('静的生成チェックサムが不正です。');
         }
         $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
         if ($extension === 'html') {
             if (!str_starts_with($bytes, '<!doctype html>') || !str_contains($bytes, 'data-theme=')) {
-                $this->runtime->locks->lock('HTML生成結果が不正です。');
+                $this->runtime->serverSide->lock('HTML生成結果が不正です。');
                 throw new \RuntimeException('HTML生成結果が不正です。');
             }
             return;
@@ -244,26 +242,26 @@ final class StaticGenerator
         if ($extension === 'json') {
             json_decode($bytes, true);
             if (json_last_error() !== JSON_ERROR_NONE) {
-                $this->runtime->locks->lock('JSON生成結果が不正です。');
+                $this->runtime->serverSide->lock('JSON生成結果が不正です。');
                 throw new \RuntimeException('JSON生成結果が不正です。');
             }
             return;
         }
         if ($extension === 'png') {
             if (!str_starts_with($bytes, "\x89PNG\r\n\x1a\n")) {
-                $this->runtime->locks->lock('PNG生成結果が不正です。');
+                $this->runtime->serverSide->lock('PNG生成結果が不正です。');
                 throw new \RuntimeException('PNG生成結果が不正です。');
             }
             return;
         }
         if ($extension === 'svg') {
             if (!preg_match('/<svg[\s>]/i', $bytes)) {
-                $this->runtime->locks->lock('SVG生成結果が不正です。');
+                $this->runtime->serverSide->lock('SVG生成結果が不正です。');
                 throw new \RuntimeException('SVG生成結果が不正です。');
             }
             return;
         }
-        $this->runtime->locks->lock('静的生成拡張子が不正です。');
+        $this->runtime->serverSide->lock('静的生成拡張子が不正です。');
         throw new \RuntimeException('静的生成拡張子が不正です。');
     }
 }

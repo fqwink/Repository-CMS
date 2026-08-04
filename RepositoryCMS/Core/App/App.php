@@ -4,10 +4,6 @@ declare(strict_types=1);
 
 namespace RepositoryCms\Core;
 
-use ServerSideLogicFramework\Security;
-use ServerSideLogicFramework\UpdateApplier;
-use ServerSideLogicFramework\UpdateValidator;
-
 final class App
 {
     private const MAINTENANCE_RELEASE_WAIT_REASON = 'メンテナンス解除待機中です。';
@@ -18,7 +14,7 @@ final class App
     public function __construct(private readonly Runtime $runtime)
     {
         $this->content = new ContentManager($runtime);
-        $this->renderer = new Renderer();
+        $this->renderer = new Renderer($runtime->serverSide);
     }
 
     public function handle(): void
@@ -34,9 +30,9 @@ final class App
             if ($action === 'logout') {
                 $this->runtime->serverSide->requireLogin();
                 $this->runtime->serverSide->authorize($action);
-                $user = $this->runtime->auth->user();
+                $user = $this->runtime->serverSide->user();
                 $this->audit('auth.logout', ['user' => $user]);
-                $this->runtime->auth->logout();
+                $this->runtime->serverSide->logout();
                 Response::redirect('?action=login');
             }
 
@@ -70,7 +66,7 @@ final class App
 
     private function redirectInitialAdminChange(string $action): void
     {
-        if (!$this->runtime->auth->initialAdminChangeRequired()) {
+        if (!$this->runtime->serverSide->initialAdminChangeRequired()) {
             return;
         }
         if (in_array($action, ['initial_admin', 'logout'], true)) {
@@ -81,41 +77,39 @@ final class App
 
     private function initialAdmin(): void
     {
-        if (!$this->runtime->auth->initialAdminChangeRequired()) {
+        if (!$this->runtime->serverSide->initialAdminChangeRequired()) {
             Response::redirect('?');
         }
         if ($this->requestMethod() === 'POST') {
-            Security::requireCsrf();
-            if ($this->runtime->locks->locked()) {
-                throw new \RuntimeException('CMSがロックされています。');
-            }
+            $this->runtime->serverSide->requireCsrf();
+            $this->runtime->serverSide->ensureUnlocked();
             $username = (string) $_POST['username'];
-            $this->runtime->auth->completeInitialAdminChange($username, (string) $_POST['password']);
+            $this->runtime->serverSide->completeInitialAdminChange($username, (string) $_POST['password']);
             $this->audit('auth.initial_admin_complete', ['user' => $username]);
             Response::redirect('?');
         }
-        $state = $this->runtime->auth->initialAdminState();
+        $state = $this->runtime->serverSide->initialAdminState();
         $remaining = max(0, 5 - (int) $state['access_count']);
         $message = $state['deadline_reached']
             ? '<div class="alert">初期管理者変更期限に到達しています。変更完了まで他の操作はできません。</div>'
             : '<div class="notice">初期ユーザー名と初期パスワードを変更してください。残りアクセス回数: ' . $remaining . '</div>';
-        $body = $message . '<section class="panel"><h2>初期管理者変更</h2><p class="muted">初期ユーザー名 admin と初期パスワード admin は継続利用できません。ユーザー名は一度設定すると変更できません。</p><form method="post"><input type="hidden" name="csrf" value="' . Security::csrfToken() . '"><label>新しいユーザー名</label><input name="username" required><label>新しいパスワード</label><input name="password" type="password" required><p><button>変更</button></p></form></section>';
+        $body = $message . '<section class="panel"><h2>初期管理者変更</h2><p class="muted">初期ユーザー名 admin と初期パスワード admin は継続利用できません。ユーザー名は一度設定すると変更できません。</p><form method="post"><input type="hidden" name="csrf" value="' . $this->runtime->serverSide->csrfToken() . '"><label>新しいユーザー名</label><input name="username" required><label>新しいパスワード</label><input name="password" type="password" required><p><button>変更</button></p></form></section>';
         Response::html('初期管理者変更', $body, $this->runtime);
     }
 
     private function login(): void
     {
         $message = '';
-        if ($this->runtime->auth->loginLocked()) {
-            $lockedUntil = gmdate(DATE_ATOM, $this->runtime->auth->loginLockedUntil());
+        if ($this->runtime->serverSide->loginLocked()) {
+            $lockedUntil = gmdate(DATE_ATOM, $this->runtime->serverSide->loginLockedUntil());
             $message = '<div class="alert">ログインは一時ロックされています。解除予定: ' . Response::escape($lockedUntil) . '</div>';
         }
-        if ($this->requestMethod() === 'POST' && !$this->runtime->auth->loginLocked()) {
-            Security::requireCsrf();
+        if ($this->requestMethod() === 'POST' && !$this->runtime->serverSide->loginLocked()) {
+            $this->runtime->serverSide->requireCsrf();
             $username = (string) $_POST['username'];
-            if ($this->runtime->auth->login($username, (string) $_POST['password'])) {
-                if ($this->runtime->auth->initialAdminChangeRequired()) {
-                    $this->runtime->auth->recordInitialAdminAccess();
+            if ($this->runtime->serverSide->login($username, (string) $_POST['password'])) {
+                if ($this->runtime->serverSide->initialAdminChangeRequired()) {
+                    $this->runtime->serverSide->recordInitialAdminAccess();
                 }
                 $this->audit('auth.login_success', ['user' => $username]);
                 Response::redirect('?');
@@ -123,13 +117,13 @@ final class App
             $this->audit('auth.login_failure', ['user' => $username]);
             $message = '<div class="alert">ログインに失敗しました。</div>';
         }
-        $body = $message . '<section class="panel"><h2>ログイン</h2><form method="post"><input type="hidden" name="csrf" value="' . Security::csrfToken() . '"><label>ユーザー名</label><input name="username" required><label>パスワード</label><input name="password" type="password" required><p><button>ログイン</button></p></form></section>';
+        $body = $message . '<section class="panel"><h2>ログイン</h2><form method="post"><input type="hidden" name="csrf" value="' . $this->runtime->serverSide->csrfToken() . '"><label>ユーザー名</label><input name="username" required><label>パスワード</label><input name="password" type="password" required><p><button>ログイン</button></p></form></section>';
         Response::html('ログイン', $body, $this->runtime);
     }
 
     private function index(): void
     {
-        if ($this->runtime->locks->locked()) {
+        if ($this->runtime->serverSide->locked()) {
             $body = '<section class="page-head"><h2>状態確認</h2><p>CMSは現在ロック中です。許可された操作のみ実行できます。</p></section>'
                 . $this->statusDashboard()
                 . $this->operationPanel(true);
@@ -147,15 +141,15 @@ final class App
 
     private function statusDashboard(): string
     {
-        $lock = $this->runtime->locks->state();
+        $lock = $this->runtime->serverSide->lockState();
         $locked = $lock['locked'] === true;
         $reason = (string) ($lock['reason'] ?? '');
         $maintenance = $locked && str_contains($reason, 'メンテナンス');
         $gitConfigured = $this->runtime->git->configured();
         $updateConfigured = $this->runtime->config->updateConfigured();
-        $authState = $this->runtime->auth->user() === null ? '未認証' : '認証済み';
-        $role = $this->runtime->auth->role() ?? '-';
-        $initialAdminState = $this->runtime->auth->initialAdminState();
+        $authState = $this->runtime->serverSide->user() === null ? '未認証' : '認証済み';
+        $role = $this->runtime->serverSide->role() ?? '-';
+        $initialAdminState = $this->runtime->serverSide->initialAdminState();
 
         $cards = [
             ['CMS状態', $locked ? 'ロック中' : '通常稼働', $locked ? 'danger' : 'ok'],
@@ -163,7 +157,7 @@ final class App
             ['メンテナンス状態', $maintenance ? 'メンテナンス中' : '通常', $maintenance ? 'warn' : 'ok'],
             ['Gitプロバイダー', $gitConfigured ? '設定済み' : '未設定', $gitConfigured ? 'ok' : 'danger'],
             ['アップデート設定', $updateConfigured ? '設定済み' : '未設定', $updateConfigured ? 'ok' : 'warn'],
-            ['認証状態', $authState . ' / ' . $role, $this->runtime->auth->user() === null ? 'warn' : 'ok'],
+            ['認証状態', $authState . ' / ' . $role, $this->runtime->serverSide->user() === null ? 'warn' : 'ok'],
             ['初期管理者', $initialAdminState['completed'] ? '変更済み' : '変更必須', $initialAdminState['completed'] ? 'ok' : 'warn'],
         ];
 
@@ -181,8 +175,8 @@ final class App
     private function operationPanel(bool $locked): string
     {
         $disabledNote = $locked ? '<p class="muted">CMSロック中は、状態確認、ログアウト、アップデート状態確認以外の操作は制限されます。</p>' : '';
-        $admin = $this->runtime->auth->role() === 'admin';
-        $initialDone = $this->runtime->auth->initialAdminCompleted();
+        $admin = $this->runtime->serverSide->role() === 'admin';
+        $initialDone = $this->runtime->serverSide->initialAdminCompleted();
         $links = [
             ['作成', '?action=new', '新しいコンテンツを作成します。', !$locked],
             ['静的生成', '?action=generate', 'コンテンツから公開成果物を生成します。', !$locked],
@@ -219,28 +213,28 @@ final class App
     {
         $value = '';
         if ($path !== null && $path !== '') {
-            $extension = Security::allowedExtension($path);
+            $extension = $this->runtime->serverSide->allowedExtension($path);
             if ($extension !== 'png') {
                 $value = $this->content->read($path);
             }
         }
-        $body = '<section class="panel"><h2>編集</h2><form method="post" enctype="multipart/form-data" action="?action=save"><input type="hidden" name="csrf" value="' . Security::csrfToken() . '"><label>パス</label><input name="path" value="' . Response::escape($path ?? '') . '" placeholder="pages/index.md" required><label>内容</label><textarea name="body">' . Response::escape($value) . '</textarea><label>ファイル</label><input name="content_file" type="file" accept=".md,.json,.png,.svg"><p class="row"><button>保存</button><button class="button secondary" formaction="?action=preview" formmethod="post">プレビュー</button></p></form></section>';
+        $body = '<section class="panel"><h2>編集</h2><form method="post" enctype="multipart/form-data" action="?action=save"><input type="hidden" name="csrf" value="' . $this->runtime->serverSide->csrfToken() . '"><label>パス</label><input name="path" value="' . Response::escape($path ?? '') . '" placeholder="pages/index.md" required><label>内容</label><textarea name="body">' . Response::escape($value) . '</textarea><label>ファイル</label><input name="content_file" type="file" accept=".md,.json,.png,.svg"><p class="row"><button>保存</button><button class="button secondary" formaction="?action=preview" formmethod="post">プレビュー</button></p></form></section>';
         Response::html('編集', $body, $this->runtime);
     }
 
     private function save(): void
     {
-        Security::requireCsrf();
+        $this->runtime->serverSide->requireCsrf();
         $path = (string) $_POST['path'];
         $body = $this->submittedBytes();
         $this->content->save($path, $body);
-        $this->audit('content.save', ['path' => $path, 'user' => $this->runtime->auth->user()]);
+        $this->audit('content.save', ['path' => $path, 'user' => $this->runtime->serverSide->user()]);
         Response::redirect('?action=edit&path=' . rawurlencode($path));
     }
 
     private function preview(): void
     {
-        Security::requireCsrf();
+        $this->runtime->serverSide->requireCsrf();
         $path = (string) $_POST['path'];
         $body = $this->submittedBytes();
         $preview = $this->renderer->preview($path, $body);
@@ -272,7 +266,7 @@ final class App
         $rows = '';
         foreach ($this->content->history($path) as $item) {
             $sha = (string) $item['sha'];
-            $rows .= '<tr><td>' . Response::escape(substr($sha, 0, 12)) . '</td><td>' . Response::escape((string) $item['date']) . '</td><td>' . Response::escape((string) $item['message']) . '</td><td><form method="post" action="?action=restore"><input type="hidden" name="csrf" value="' . Security::csrfToken() . '"><input type="hidden" name="path" value="' . Response::escape($path) . '"><input type="hidden" name="ref" value="' . Response::escape($sha) . '"><button>復元</button></form></td></tr>';
+            $rows .= '<tr><td>' . Response::escape(substr($sha, 0, 12)) . '</td><td>' . Response::escape((string) $item['date']) . '</td><td>' . Response::escape((string) $item['message']) . '</td><td><form method="post" action="?action=restore"><input type="hidden" name="csrf" value="' . $this->runtime->serverSide->csrfToken() . '"><input type="hidden" name="path" value="' . Response::escape($path) . '"><input type="hidden" name="ref" value="' . Response::escape($sha) . '"><button>復元</button></form></td></tr>';
         }
         if ($rows === '') {
             $rows = '<tr><td colspan="4" class="muted">履歴はありません。</td></tr>';
@@ -282,35 +276,35 @@ final class App
 
     private function restore(): void
     {
-        Security::requireCsrf();
+        $this->runtime->serverSide->requireCsrf();
         $path = (string) $_POST['path'];
         $ref = (string) $_POST['ref'];
         $this->content->restore($path, $ref);
-        $this->audit('content.restore', ['path' => $path, 'ref' => $ref, 'user' => $this->runtime->auth->user()]);
+        $this->audit('content.restore', ['path' => $path, 'ref' => $ref, 'user' => $this->runtime->serverSide->user()]);
         Response::redirect('?action=edit&path=' . rawurlencode($path));
     }
 
     private function generate(): void
     {
         if ($this->requestMethod() !== 'POST') {
-            Response::html('静的生成', '<section class="panel"><h2>静的生成</h2><form method="post" action="?action=generate"><input type="hidden" name="csrf" value="' . Security::csrfToken() . '"><p>コンテンツから静的生成を実行します。</p><button>実行</button></form></section>', $this->runtime);
+            Response::html('静的生成', '<section class="panel"><h2>静的生成</h2><form method="post" action="?action=generate"><input type="hidden" name="csrf" value="' . $this->runtime->serverSide->csrfToken() . '"><p>コンテンツから静的生成を実行します。</p><button>実行</button></form></section>', $this->runtime);
             return;
         }
-        Security::requireCsrf();
+        $this->runtime->serverSide->requireCsrf();
         $report = (new StaticGenerator($this->runtime, $this->renderer))->generateReport();
-        $this->audit('static.generate', ['count' => $report['succeeded'], 'failed' => $report['failed'], 'user' => $this->runtime->auth->user()]);
+        $this->audit('static.generate', ['count' => $report['succeeded'], 'failed' => $report['failed'], 'user' => $this->runtime->serverSide->user()]);
         Response::html('静的生成', $this->generationReportHtml('静的生成', $report), $this->runtime);
     }
 
     private function publish(): void
     {
         if ($this->requestMethod() !== 'POST') {
-            Response::html('公開', '<section class="panel"><h2>公開</h2><form method="post" action="?action=publish"><input type="hidden" name="csrf" value="' . Security::csrfToken() . '"><p>静的生成物を公開リポジトリへ保存します。</p><button>公開</button></form></section>', $this->runtime);
+            Response::html('公開', '<section class="panel"><h2>公開</h2><form method="post" action="?action=publish"><input type="hidden" name="csrf" value="' . $this->runtime->serverSide->csrfToken() . '"><p>静的生成物を公開リポジトリへ保存します。</p><button>公開</button></form></section>', $this->runtime);
             return;
         }
-        Security::requireCsrf();
+        $this->runtime->serverSide->requireCsrf();
         $report = (new StaticGenerator($this->runtime, $this->renderer))->publishReport();
-        $this->audit('static.publish', ['count' => $report['succeeded'], 'failed' => $report['failed'], 'user' => $this->runtime->auth->user()]);
+        $this->audit('static.publish', ['count' => $report['succeeded'], 'failed' => $report['failed'], 'user' => $this->runtime->serverSide->user()]);
         Response::html('公開', $this->generationReportHtml('公開', $report), $this->runtime);
     }
 
@@ -339,16 +333,16 @@ final class App
             $checked = $active === $name ? ' checked' : '';
             $rows .= '<label class="theme-option"><input type="radio" name="theme" value="' . Response::escape($name) . '"' . $checked . '><span><strong>' . Response::escape((string) $theme['label']) . '</strong><em>' . Response::escape((string) $theme['description']) . '</em></span><i style="background:' . Response::escape((string) $theme['primary']) . '"></i><i style="background:' . Response::escape((string) $theme['secondary']) . '"></i><i style="background:' . Response::escape((string) $theme['accent']) . '"></i></label>';
         }
-        $body = '<section class="panel"><h2>テーマ管理</h2><p class="muted">静的生成時に使用する標準テーマを1個選択します。管理画面は公開テーマの影響を受けません。</p><form method="post" action="?action=theme_save"><input type="hidden" name="csrf" value="' . Security::csrfToken() . '">' . $rows . '<p><button>保存</button></p></form></section>';
+        $body = '<section class="panel"><h2>テーマ管理</h2><p class="muted">静的生成時に使用する標準テーマを1個選択します。管理画面は公開テーマの影響を受けません。</p><form method="post" action="?action=theme_save"><input type="hidden" name="csrf" value="' . $this->runtime->serverSide->csrfToken() . '">' . $rows . '<p><button>保存</button></p></form></section>';
         Response::html('テーマ管理', $body, $this->runtime);
     }
 
     private function saveTheme(): void
     {
-        Security::requireCsrf();
+        $this->runtime->serverSide->requireCsrf();
         $theme = (string) ($_POST['theme'] ?? '');
         $this->writeActiveTheme($theme);
-        $this->audit('theme.save', ['theme' => $theme, 'user' => $this->runtime->auth->user()]);
+        $this->audit('theme.save', ['theme' => $theme, 'user' => $this->runtime->serverSide->user()]);
         Response::redirect('?action=themes');
     }
 
@@ -360,13 +354,13 @@ final class App
         }
         $bytes = file_get_contents($path);
         if ($bytes === false) {
-            $this->runtime->locks->lock('テーマ設定を読み取れません。');
+            $this->runtime->serverSide->lock('テーマ設定を読み取れません。');
             throw new \RuntimeException('テーマ設定を読み取れません。');
         }
         $data = json_decode($bytes, true);
         $theme = is_array($data) ? (string) ($data['active_theme'] ?? '') : '';
         if (!StaticGenerator::validTheme($theme)) {
-            $this->runtime->locks->lock('有効テーマが不正です。');
+            $this->runtime->serverSide->lock('有効テーマが不正です。');
             throw new \RuntimeException('有効テーマが不正です。');
         }
         return $theme;
@@ -383,17 +377,17 @@ final class App
             'updated_at' => gmdate(DATE_ATOM),
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         if ($payload === false || file_put_contents($path, $payload, LOCK_EX) === false) {
-            $this->runtime->locks->lock('テーマ設定を保存できません。');
+            $this->runtime->serverSide->lock('テーマ設定を保存できません。');
             throw new \RuntimeException('テーマ設定を保存できません。');
         }
         $readBack = file_get_contents($path);
         if ($readBack === false || !hash_equals(hash('sha256', $payload), hash('sha256', $readBack))) {
-            $this->runtime->locks->lock('テーマ設定の保全確認に失敗しました。');
+            $this->runtime->serverSide->lock('テーマ設定の保全確認に失敗しました。');
             throw new \RuntimeException('テーマ設定の保全確認に失敗しました。');
         }
         $data = json_decode($readBack, true);
         if (!is_array($data) || (string) ($data['active_theme'] ?? '') !== $theme) {
-            $this->runtime->locks->lock('テーマ設定の整合性確認に失敗しました。');
+            $this->runtime->serverSide->lock('テーマ設定の整合性確認に失敗しました。');
             throw new \RuntimeException('テーマ設定の整合性確認に失敗しました。');
         }
     }
@@ -424,15 +418,15 @@ final class App
         if ($this->requestMethod() !== 'POST') {
             Response::redirect('?action=updates');
         }
-        Security::requireCsrf();
+        $this->runtime->serverSide->requireCsrf();
         $version = (string) ($_POST['version'] ?? '');
         $release = $this->findUpdateRelease($version);
-        $report = (new UpdateValidator($this->runtime))->validate($release);
+        $report = $this->runtime->serverSide->validateUpdate($this->runtime, $release);
         $this->audit('update.validate', [
             'version' => $version,
             'valid' => $report['valid'],
             'failed' => $report['failed'],
-            'user' => $this->runtime->auth->user(),
+            'user' => $this->runtime->serverSide->user(),
         ]);
         $body = '<section class="panel"><div class="section-title"><h2>アップデート事前検証</h2><a class="button secondary" href="?action=updates">一覧へ戻る</a></div>'
             . $this->updateValidationReportHtml($report)
@@ -445,15 +439,15 @@ final class App
         if ($this->requestMethod() !== 'POST') {
             Response::redirect('?action=updates');
         }
-        Security::requireCsrf();
+        $this->runtime->serverSide->requireCsrf();
         $version = (string) ($_POST['version'] ?? '');
         $release = $this->findUpdateRelease($version);
-        $report = (new UpdateApplier($this->runtime, self::MAINTENANCE_RELEASE_WAIT_REASON))->apply($release);
+        $report = $this->runtime->serverSide->applyUpdate($this->runtime, $release, self::MAINTENANCE_RELEASE_WAIT_REASON);
         $this->audit('update.apply', [
             'version' => $version,
             'valid' => $report['valid'],
             'failed' => $report['failed'],
-            'user' => $this->runtime->auth->user(),
+            'user' => $this->runtime->serverSide->user(),
         ]);
         $body = '<section class="panel"><h2>アップデート適用</h2>'
             . $this->updateValidationReportHtml($report)
@@ -463,19 +457,19 @@ final class App
 
     private function users(): void
     {
-        if (!$this->runtime->auth->initialAdminCompleted()) {
+        if (!$this->runtime->serverSide->initialAdminCompleted()) {
             throw new \RuntimeException('初期管理者変更が完了するまでユーザーを設定できません。');
         }
         $rows = '';
-        foreach ($this->runtime->auth->users() as $user) {
+        foreach ($this->runtime->serverSide->users() as $user) {
             $username = (string) $user['username'];
-            $rows .= '<tr><td>' . Response::escape($username) . '</td><td>' . Response::escape((string) $user['role']) . '</td><td>' . Response::escape((string) $user['created_at']) . '</td><td><form method="post" action="?action=user_password"><input type="hidden" name="csrf" value="' . Security::csrfToken() . '"><input type="hidden" name="username" value="' . Response::escape($username) . '"><input name="password" type="password" required placeholder="新しいパスワード"><button>変更</button></form></td></tr>';
+            $rows .= '<tr><td>' . Response::escape($username) . '</td><td>' . Response::escape((string) $user['role']) . '</td><td>' . Response::escape((string) $user['created_at']) . '</td><td><form method="post" action="?action=user_password"><input type="hidden" name="csrf" value="' . $this->runtime->serverSide->csrfToken() . '"><input type="hidden" name="username" value="' . Response::escape($username) . '"><input name="password" type="password" required placeholder="新しいパスワード"><button>変更</button></form></td></tr>';
         }
         if ($rows === '') {
             $rows = '<tr><td colspan="4" class="muted">ユーザーはありません。</td></tr>';
         }
         $body = '<section class="panel"><h2>ユーザー</h2><p class="muted">管理者1人、編集担当2人まで作成できます。ユーザー名は一度設定すると変更できません。</p><table class="list"><tr><th>ユーザー名</th><th>ロール</th><th>作成日時</th><th>パスワード変更</th></tr>' . $rows . '</table></section>'
-            . '<section class="panel"><h2>ユーザー作成</h2><form method="post" action="?action=user_create"><input type="hidden" name="csrf" value="' . Security::csrfToken() . '"><label>ユーザー名</label><input name="username" required><label>ロール</label><select name="role"><option value="editor">編集担当</option><option value="admin">管理者</option></select><label>パスワード</label><input name="password" type="password" required><p><button>作成</button></p></form></section>';
+            . '<section class="panel"><h2>ユーザー作成</h2><form method="post" action="?action=user_create"><input type="hidden" name="csrf" value="' . $this->runtime->serverSide->csrfToken() . '"><label>ユーザー名</label><input name="username" required><label>ロール</label><select name="role"><option value="editor">編集担当</option><option value="admin">管理者</option></select><label>パスワード</label><input name="password" type="password" required><p><button>作成</button></p></form></section>';
         Response::html('ユーザー', $body, $this->runtime);
     }
 
@@ -484,11 +478,11 @@ final class App
         if ($this->requestMethod() !== 'POST') {
             Response::redirect('?action=users');
         }
-        Security::requireCsrf();
+        $this->runtime->serverSide->requireCsrf();
         $username = (string) ($_POST['username'] ?? '');
         $role = (string) ($_POST['role'] ?? '');
-        $this->runtime->auth->createUser($username, (string) ($_POST['password'] ?? ''), $role);
-        $this->audit('user.create', ['created_user' => $username, 'role' => $role, 'user' => $this->runtime->auth->user()]);
+        $this->runtime->serverSide->createUser($username, (string) ($_POST['password'] ?? ''), $role);
+        $this->audit('user.create', ['created_user' => $username, 'role' => $role, 'user' => $this->runtime->serverSide->user()]);
         Response::redirect('?action=users');
     }
 
@@ -497,10 +491,10 @@ final class App
         if ($this->requestMethod() !== 'POST') {
             Response::redirect('?action=users');
         }
-        Security::requireCsrf();
+        $this->runtime->serverSide->requireCsrf();
         $username = (string) ($_POST['username'] ?? '');
-        $this->runtime->auth->changePassword($username, (string) ($_POST['password'] ?? ''));
-        $this->audit('user.password_change', ['target_user' => $username, 'user' => $this->runtime->auth->user()]);
+        $this->runtime->serverSide->changePassword($username, (string) ($_POST['password'] ?? ''));
+        $this->audit('user.password_change', ['target_user' => $username, 'user' => $this->runtime->serverSide->user()]);
         Response::redirect('?action=users');
     }
 
@@ -514,7 +508,7 @@ final class App
                 'method' => (string) ($_SERVER['REQUEST_METHOD'] ?? ''),
             ]);
         } catch (\Throwable $error) {
-            $this->runtime->locks->lock('運用履歴の記録に失敗しました。');
+            $this->runtime->serverSide->lock('運用履歴の記録に失敗しました。');
             throw $error;
         }
     }
@@ -526,7 +520,7 @@ final class App
 
     private function updateNotice(): string
     {
-        if ($this->runtime->auth->role() !== 'admin') {
+        if ($this->runtime->serverSide->role() !== 'admin') {
             return '';
         }
         try {
@@ -556,7 +550,7 @@ final class App
             $fileCount = is_array($release['files'] ?? null) ? count($release['files']) : 0;
             $operation = '<span class="muted">-</span>';
             if ($withForm) {
-                $operation = '<form method="post" action="?action=update_validate"><input type="hidden" name="csrf" value="' . Security::csrfToken() . '"><input type="hidden" name="version" value="' . Response::escape($version) . '"><button>事前検証</button></form>';
+                $operation = '<form method="post" action="?action=update_validate"><input type="hidden" name="csrf" value="' . $this->runtime->serverSide->csrfToken() . '"><input type="hidden" name="version" value="' . Response::escape($version) . '"><button>事前検証</button></form>';
             }
             $rows .= '<tr><td>' . Response::escape($version) . '</td><td>' . Response::escape($targetVersion === '' ? '-' : $targetVersion) . '</td><td>' . Response::escape($releasedAt) . '</td><td>' . Response::escape($php === '' ? '-' : $php) . '</td><td>' . $fileCount . '</td><td><span class="badge">検証可能</span></td><td>' . $operation . '</td></tr>';
         }
@@ -591,8 +585,8 @@ final class App
             $rows = '<tr><td colspan="3" class="muted">検証項目はありません。</td></tr>';
         }
         $apply = '';
-        if (($report['valid'] ?? false) === true && isset($report['version']) && $this->runtime->auth->role() === 'admin') {
-            $apply = '<form method="post" action="?action=update_apply"><input type="hidden" name="csrf" value="' . Security::csrfToken() . '"><input type="hidden" name="version" value="' . Response::escape((string) $report['version']) . '"><button>アップデート適用</button></form>';
+        if (($report['valid'] ?? false) === true && isset($report['version']) && $this->runtime->serverSide->role() === 'admin') {
+            $apply = '<form method="post" action="?action=update_apply"><input type="hidden" name="csrf" value="' . $this->runtime->serverSide->csrfToken() . '"><input type="hidden" name="version" value="' . Response::escape((string) $report['version']) . '"><button>アップデート適用</button></form>';
         }
         return $status . $summary . '<table class="list"><tr><th>項目</th><th>状態</th><th>内容</th></tr>' . $rows . '</table>' . $apply;
     }

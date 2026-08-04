@@ -23,10 +23,9 @@ spl_autoload_register(static function (string $class): void {
         return;
     }
 
-    $relative = substr($class, strlen($prefix));
-    $file = dirname(__DIR__, 2) . '/ServerSideLogicFramework/' . str_replace('\\', '/', $relative) . '.php';
+    $file = dirname(__DIR__, 3) . '/ServerSideLogicFramework/ServerSideLogicFramework.php';
     if (is_file($file)) {
-        require $file;
+        require_once $file;
     }
 });
 

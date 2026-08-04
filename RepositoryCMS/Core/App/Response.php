@@ -10,14 +10,14 @@ final class Response
     {
         http_response_code($status);
         header('Content-Type: text/html; charset=utf-8');
-        $lock = $runtime->locks->state();
-        $user = $runtime->auth->user();
+        $lock = $runtime->serverSide->lockState();
+        $user = $runtime->serverSide->user();
         $lockHtml = $lock['locked']
             ? '<div class="alert">CMS LOCKED: ' . self::escape($lock['reason']) . '</div>'
             : '';
         $nav = '';
         if ($user !== null) {
-            $admin = $runtime->auth->role() === 'admin';
+            $admin = $runtime->serverSide->role() === 'admin';
             $nav = '<nav><a href="?">ダッシュボード</a><a href="?action=new">作成</a><a href="?action=generate">静的生成</a>';
             if ($admin) {
                 $nav .= '<a href="?action=publish">公開</a><a href="?action=themes">テーマ</a><a href="?action=updates">アップデート</a><a href="?action=users">ユーザー</a>';

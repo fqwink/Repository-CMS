@@ -1,14 +1,16 @@
 #!/bin/sh
 set -eu
 
-ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
-cd "$ROOT_DIR"
+CMS_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+REPO_ROOT=$(CDPATH= cd -- "$CMS_ROOT/.." && pwd)
+CMS_DIR=RepositoryCMS
+cd "$REPO_ROOT"
 
 check_protected_tracked_config() {
   echo "== Protected tracked config =="
-  if git ls-files Core/Config | grep -E '^Core/Config/.+\.json$' >/dev/null 2>&1; then
-    echo "Protected runtime config is tracked under Core/Config." >&2
-    git ls-files Core/Config | grep -E '^Core/Config/.+\.json$' >&2
+  if git ls-files "$CMS_DIR/Core/Config" | grep -E "^$CMS_DIR/Core/Config/.+\.json$" >/dev/null 2>&1; then
+    echo "Protected runtime config is tracked under $CMS_DIR/Core/Config." >&2
+    git ls-files "$CMS_DIR/Core/Config" | grep -E "^$CMS_DIR/Core/Config/.+\.json$" >&2
     exit 1
   fi
 }
@@ -31,12 +33,12 @@ if [ -z "${PHP_BIN:-}" ]; then
     if command -v git >/dev/null 2>&1 && [ "${RELEASE_CHECK_GIT_DONE:-0}" != "1" ]; then
       run_git_checks
     fi
-    exec "$DOCKER_BIN" run --rm -e RELEASE_CHECK_GIT_DONE=1 -v "$ROOT_DIR:/app" -w /app php:8.4-cli sh Core/App/release-check.sh
+    exec "$DOCKER_BIN" run --rm -e RELEASE_CHECK_GIT_DONE=1 -v "$REPO_ROOT:/app" -w /app php:8.4-cli sh "$CMS_DIR/Core/App/release-check.sh"
   elif [ -x /Applications/Docker.app/Contents/Resources/bin/docker ]; then
     if command -v git >/dev/null 2>&1 && [ "${RELEASE_CHECK_GIT_DONE:-0}" != "1" ]; then
       run_git_checks
     fi
-    exec /Applications/Docker.app/Contents/Resources/bin/docker run --rm -e RELEASE_CHECK_GIT_DONE=1 -v "$ROOT_DIR:/app" -w /app php:8.4-cli sh Core/App/release-check.sh
+    exec /Applications/Docker.app/Contents/Resources/bin/docker run --rm -e RELEASE_CHECK_GIT_DONE=1 -v "$REPO_ROOT:/app" -w /app php:8.4-cli sh "$CMS_DIR/Core/App/release-check.sh"
   else
     echo "php or docker is required." >&2
     exit 1
@@ -44,32 +46,48 @@ if [ -z "${PHP_BIN:-}" ]; then
 fi
 
 echo "== PHP syntax =="
-for file in Core/app.php Core/App/*.php ServerSideLogicFramework/*.php; do
+for file in "$CMS_DIR"/Core/app.php "$CMS_DIR"/Core/App/*.php ServerSideLogicFramework/*.php; do
   if [ ! -f "$file" ]; then
     continue
   fi
   "$PHP_BIN" -l "$file" >/dev/null
 done
 
+echo "== ServerSideLogicFramework single file =="
+framework_php_count=$(find ServerSideLogicFramework -maxdepth 1 -name '*.php' | wc -l | tr -d ' ')
+if [ "$framework_php_count" -ne 1 ] || [ ! -f ServerSideLogicFramework/ServerSideLogicFramework.php ]; then
+  echo "ServerSideLogicFramework PHP implementation must be ServerSideLogicFramework.php only." >&2
+  exit 1
+fi
+
 echo "== Core/App file count =="
-core_app_count=$(find Core/App -maxdepth 1 -name '*.php' | wc -l | tr -d ' ')
+core_app_count=$(find "$CMS_DIR/Core/App" -maxdepth 1 -name '*.php' | wc -l | tr -d ' ')
 if [ "$core_app_count" -gt 23 ]; then
   echo "Core/App PHP file count exceeds 23: $core_app_count" >&2
   exit 1
 fi
 
 echo "== Root directory count =="
-root_dirs=$(find . -mindepth 1 -maxdepth 1 -type d ! -name '.git' ! -name 'Docs' ! -name 'ServerSideLogicFramework' -print | sed 's#^\./##' | sort)
-if [ "$root_dirs" != "Core
-Modules
-Work" ]; then
-  echo "Root counted directories must be Core, Modules, Work:" >&2
+root_dirs=$(find . -mindepth 1 -maxdepth 1 -type d ! -name '.git' -print | sed 's#^\./##' | sort)
+if [ "$root_dirs" != "RepositoryCMS
+ServerSideLogicFramework" ]; then
+  echo "Repository root directories must be RepositoryCMS and ServerSideLogicFramework:" >&2
   echo "$root_dirs" >&2
   exit 1
 fi
 
+echo "== CMS directory count =="
+cms_dirs=$(find "$CMS_DIR" -mindepth 1 -maxdepth 1 -type d ! -name 'Docs' -print | sed "s#^$CMS_DIR/##" | sort)
+if [ "$cms_dirs" != "Core
+Modules
+Work" ]; then
+  echo "RepositoryCMS counted directories must be Core, Modules, Work:" >&2
+  echo "$cms_dirs" >&2
+  exit 1
+fi
+
 echo "== Core direct directories =="
-core_dirs=$(find Core -mindepth 1 -maxdepth 1 -type d -print | sed 's#^Core/##' | sort)
+core_dirs=$(find "$CMS_DIR/Core" -mindepth 1 -maxdepth 1 -type d -print | sed "s#^$CMS_DIR/Core/##" | sort)
 core_dir_count=$(printf '%s\n' "$core_dirs" | sed '/^$/d' | wc -l | tr -d ' ')
 if [ "$core_dir_count" -gt 7 ]; then
   echo "Core direct directory count exceeds 7: $core_dir_count" >&2
@@ -81,14 +99,14 @@ if printf '%s\n' "$core_dirs" | grep -x 'Data' >/dev/null 2>&1; then
 fi
 
 echo "== Core/Config structure =="
-if find Core/Config -mindepth 1 -type d -print | grep . >/dev/null 2>&1; then
+if find "$CMS_DIR/Core/Config" -mindepth 1 -type d -print | grep . >/dev/null 2>&1; then
   echo "Core/Config must not contain subdirectories." >&2
-  find Core/Config -mindepth 1 -type d -print >&2
+  find "$CMS_DIR/Core/Config" -mindepth 1 -type d -print >&2
   exit 1
 fi
 
 echo "== Developer managed app resources =="
-for file in Core/App/Lang/ja.json Core/App/Themes/standard.json Core/App/Themes/blog.json Core/App/Themes/media.json; do
+for file in "$CMS_DIR"/Core/App/Lang/ja.json "$CMS_DIR"/Core/App/Themes/standard.json "$CMS_DIR"/Core/App/Themes/blog.json "$CMS_DIR"/Core/App/Themes/media.json; do
   if [ ! -f "$file" ]; then
     echo "Required developer managed resource is missing: $file" >&2
     exit 1
@@ -96,7 +114,7 @@ for file in Core/App/Lang/ja.json Core/App/Themes/standard.json Core/App/Themes/
 done
 
 echo "== Work data =="
-work_entries=$(find Work -mindepth 1 -maxdepth 2 -print | sort)
+work_entries=$(find "$CMS_DIR/Work" -mindepth 1 -maxdepth 2 -print | sed "s#^$CMS_DIR/##" | sort)
 if [ "$work_entries" != "Work/.gitignore" ]; then
   echo "Work contains unexpected files:" >&2
   echo "$work_entries" >&2
@@ -104,9 +122,9 @@ if [ "$work_entries" != "Work/.gitignore" ]; then
 fi
 
 echo "== Core work data prohibition =="
-if find Core -maxdepth 2 -type d \( -iname '*work*' -o -iname '*cache*' -o -iname '*tmp*' -o -iname '*temp*' \) -print | grep . >/dev/null 2>&1; then
+if find "$CMS_DIR/Core" -maxdepth 2 -type d \( -iname '*work*' -o -iname '*cache*' -o -iname '*tmp*' -o -iname '*temp*' \) -print | grep . >/dev/null 2>&1; then
   echo "Core contains work/cache/tmp-like paths." >&2
-  find Core -maxdepth 2 -type d \( -iname '*work*' -o -iname '*cache*' -o -iname '*tmp*' -o -iname '*temp*' \) -print >&2
+  find "$CMS_DIR/Core" -maxdepth 2 -type d \( -iname '*work*' -o -iname '*cache*' -o -iname '*tmp*' -o -iname '*temp*' \) -print >&2
   exit 1
 fi
 
@@ -120,9 +138,9 @@ else
 fi
 
 echo "== Future content features not exposed in v0.13 =="
-if grep -R --exclude='release-check.sh' -n -E 'blog_post|ad_slot|広告枠を作成|ブログ投稿' Core/App AGENTS.md >/dev/null 2>&1; then
+if grep -R --exclude='release-check.sh' -n -E 'blog_post|ad_slot|広告枠を作成|ブログ投稿' "$CMS_DIR/Core/App" AGENTS.md >/dev/null 2>&1; then
   echo "v0.14+ content feature code or UI is exposed in v0.13." >&2
-  grep -R --exclude='release-check.sh' -n -E 'blog_post|ad_slot|広告枠を作成|ブログ投稿' Core/App AGENTS.md >&2
+  grep -R --exclude='release-check.sh' -n -E 'blog_post|ad_slot|広告枠を作成|ブログ投稿' "$CMS_DIR/Core/App" AGENTS.md >&2
   exit 1
 fi
 
@@ -138,7 +156,7 @@ fi
 echo "== Conservation tests =="
 "$PHP_BIN" <<'PHP'
 <?php
-require 'Core/App/Bootstrap.php';
+require 'RepositoryCMS/Core/App/Bootstrap.php';
 
 use RepositoryCms\Core\Config;
 use RepositoryCms\Core\ContentManager;
@@ -186,7 +204,8 @@ function release_runtime(string $suffix, ReleaseCheckMemoryGit $git): array
     $config = new Config('github', 'token', 'owner', 'content', 'public', 'ops', 'updates', 'main', 'updates/releases.json', 'main');
     $locks = new LockManager($base . '/config/cms_lock.json');
     $auth = new Auth($base . '/config/auth.json', $base . '/config/login_state.json', $base . '/config/admin_initial_state.json');
-    $runtime = new Runtime('/app/Core', '/app/Core/App', $base . '/config', $base . '/work', $config, $locks, new WorkData($base . '/work', $locks), $git, $auth, new ServerSideLogicFramework($auth, $locks));
+    $workData = new WorkData($base . '/work', $locks);
+    $runtime = new Runtime('/app/RepositoryCMS/Core', '/app/RepositoryCMS/Core/App', $base . '/config', $base . '/work', $config, $locks, $workData, $git, $auth, new ServerSideLogicFramework($auth, $locks, $workData));
     return [$base, $runtime, $locks];
 }
 
@@ -220,7 +239,7 @@ PHP
 echo "== Theme source tests =="
 "$PHP_BIN" <<'PHP'
 <?php
-require 'Core/App/Bootstrap.php';
+require 'RepositoryCMS/Core/App/Bootstrap.php';
 
 use RepositoryCms\Core\StaticGenerator;
 
@@ -238,10 +257,10 @@ if (StaticGenerator::validTheme('custom')) {
 echo "theme-source-ok\n";
 PHP
 
-echo "== update apply and users =="
+echo "== App render tests =="
 "$PHP_BIN" <<'PHP'
 <?php
-require 'Core/App/Bootstrap.php';
+require 'RepositoryCMS/Core/App/Bootstrap.php';
 
 use RepositoryCms\Core\App;
 use RepositoryCms\Core\Config;
@@ -249,9 +268,79 @@ use RepositoryCms\Core\GitProvider;
 use RepositoryCms\Core\Runtime;
 use ServerSideLogicFramework\Auth;
 use ServerSideLogicFramework\LockManager;
-use ServerSideLogicFramework\Security;
 use ServerSideLogicFramework\ServerSideLogicFramework;
-use ServerSideLogicFramework\UpdateApplier;
+use ServerSideLogicFramework\WorkData;
+
+final class ReleaseCheckRenderGit implements GitProvider
+{
+    public array $content = ['pages/index.md' => '# Hello'];
+    public array $public = [];
+    public array $logs = [];
+
+    public function configured(): bool { return true; }
+    public function listContent(): array { return [['path' => 'pages/index.md', 'size' => strlen($this->content['pages/index.md'])]]; }
+    public function readContent(string $path): string { return $this->content[$path] ?? ''; }
+    public function readContentAt(string $path, string $ref): string { return $this->readContent($path); }
+    public function saveContent(string $path, string $bytes, string $message): void { $this->content[$path] = $bytes; }
+    public function history(string $path): array { return [['sha' => 'abcdef1234567890', 'date' => '2026-08-05T00:00:00Z', 'message' => 'test']]; }
+    public function readPublicContent(string $path): string { return $this->public[$path] ?? ''; }
+    public function savePublicContent(string $path, string $bytes, string $message): void { $this->public[$path] = $bytes; }
+    public function saveOperationLog(array $event): void { $this->logs[] = $event; }
+    public function listUpdateReleases(): array { return []; }
+    public function readUpdateFile(string $path): string { return ''; }
+}
+
+$base = sys_get_temp_dir() . '/repository-cms-render-' . bin2hex(random_bytes(4));
+mkdir($base . '/core/App', 0700, true);
+mkdir($base . '/config', 0700, true);
+mkdir($base . '/work', 0700, true);
+file_put_contents($base . '/work/.gitignore', '');
+$config = new Config('github', 'token', 'owner', 'content', 'public', 'ops', 'updates', 'main', 'updates/releases.json', 'main');
+$locks = new LockManager($base . '/config/cms_lock.json');
+$auth = new Auth($base . '/config/auth.json', $base . '/config/login_state.json', $base . '/config/admin_initial_state.json');
+$workData = new WorkData($base . '/work', $locks);
+$git = new ReleaseCheckRenderGit();
+$runtime = new Runtime($base . '/core', '/app/RepositoryCMS/Core/App', $base . '/config', $base . '/work', $config, $locks, $workData, $git, $auth, new ServerSideLogicFramework($auth, $locks, $workData));
+$runtime->serverSide->boot('メンテナンス解除待機中です。');
+$runtime->serverSide->completeInitialAdminChange('owner', 'Password123456');
+$_SESSION['admin'] = 'owner';
+$_SESSION['role'] = 'admin';
+$_SESSION['last_seen_at'] = time();
+$_SERVER['REQUEST_METHOD'] = 'GET';
+
+$_GET = [];
+ob_start();
+(new App($runtime))->handle();
+$html = ob_get_clean();
+if (!str_contains($html, 'ダッシュボード') || !str_contains($html, 'pages/index.md')) {
+    fwrite(STDERR, "dashboard render failed\n");
+    exit(1);
+}
+
+$_GET = ['action' => 'generate'];
+ob_start();
+(new App($runtime))->handle();
+$html = ob_get_clean();
+if (!str_contains($html, '静的生成') || !str_contains($html, '実行')) {
+    fwrite(STDERR, "generate form render failed\n");
+    exit(1);
+}
+
+echo "app-render-ok\n";
+PHP
+
+echo "== update apply and users =="
+"$PHP_BIN" <<'PHP'
+<?php
+require 'RepositoryCMS/Core/App/Bootstrap.php';
+
+use RepositoryCms\Core\App;
+use RepositoryCms\Core\Config;
+use RepositoryCms\Core\GitProvider;
+use RepositoryCms\Core\Runtime;
+use ServerSideLogicFramework\Auth;
+use ServerSideLogicFramework\LockManager;
+use ServerSideLogicFramework\ServerSideLogicFramework;
 use ServerSideLogicFramework\WorkData;
 
 final class ReleaseCheckUpdateGit implements GitProvider
@@ -297,7 +386,8 @@ $config = new Config('github', 'token', 'owner', 'content', 'public', 'ops', 'up
 $locks = new LockManager($base . '/config/cms_lock.json');
 $git = new ReleaseCheckUpdateGit();
 $auth = new Auth($base . '/config/auth.json', $base . '/config/login_state.json', $base . '/config/admin_initial_state.json');
-$runtime = new Runtime($base . '/core', $base . '/core/App', $base . '/config', $base . '/work', $config, $locks, new WorkData($base . '/work', $locks), $git, $auth, new ServerSideLogicFramework($auth, $locks));
+$workData = new WorkData($base . '/work', $locks);
+$runtime = new Runtime($base . '/core', $base . '/core/App', $base . '/config', $base . '/work', $config, $locks, $workData, $git, $auth, new ServerSideLogicFramework($auth, $locks, $workData));
 $_SESSION['admin'] = 'admin';
 $_SESSION['role'] = 'admin';
 $_SESSION['last_seen_at'] = time();
@@ -312,7 +402,7 @@ if (!str_contains($html, 'v.0.14') || !str_contains($html, '事前検証')) {
     exit(1);
 }
 $_SERVER['REQUEST_METHOD'] = 'POST';
-$_POST['csrf'] = Security::csrfToken();
+$_POST['csrf'] = $runtime->serverSide->csrfToken();
 $_POST['version'] = 'v.0.14';
 $method = new ReflectionMethod(App::class, 'validateUpdate');
 $method->setAccessible(true);
@@ -324,7 +414,7 @@ if (!str_contains($html, '検証は成功しました') || !str_contains($html, 
     exit(1);
 }
 
-$report = (new UpdateApplier($runtime, 'メンテナンス解除待機中です。'))->apply($git->listUpdateReleases()[0]);
+$report = $runtime->serverSide->applyUpdate($runtime, $git->listUpdateReleases()[0], 'メンテナンス解除待機中です。');
 if ($report['valid'] !== true || file_get_contents($base . '/core/App/App.php') !== $git->updateBytes || $locks->state()['reason'] !== 'メンテナンス解除待機中です。') {
     fwrite(STDERR, "update apply failed\n");
     exit(1);
@@ -345,10 +435,11 @@ file_put_contents($badBase . '/config/auth.json', file_get_contents($base . '/co
 $badLocks = new LockManager($badBase . '/config/cms_lock.json');
 $badGit = new ReleaseCheckUpdateGit();
 $badAuth = new Auth($badBase . '/config/auth.json', $badBase . '/config/login_state.json', $badBase . '/config/admin_initial_state.json');
-$badRuntime = new Runtime($badBase . '/core', $badBase . '/core/App', $badBase . '/config', $badBase . '/work', $config, $badLocks, new WorkData($badBase . '/work', $badLocks), $badGit, $badAuth, new ServerSideLogicFramework($badAuth, $badLocks));
+$badWorkData = new WorkData($badBase . '/work', $badLocks);
+$badRuntime = new Runtime($badBase . '/core', $badBase . '/core/App', $badBase . '/config', $badBase . '/work', $config, $badLocks, $badWorkData, $badGit, $badAuth, new ServerSideLogicFramework($badAuth, $badLocks, $badWorkData));
 $failed = false;
 try {
-    (new UpdateApplier($badRuntime, 'メンテナンス解除待機中です。'))->apply($badGit->listUpdateReleases()[0]);
+    $badRuntime->serverSide->applyUpdate($badRuntime, $badGit->listUpdateReleases()[0], 'メンテナンス解除待機中です。');
 } catch (Throwable) {
     $failed = true;
 }

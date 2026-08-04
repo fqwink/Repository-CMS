@@ -2,7 +2,7 @@
 
 # マスター仕様書
 
-**Version:** v.0.5
+**Version:** v.0.6
 
 ---
 
@@ -21,7 +21,7 @@ Repository CMSリポジトリ内で恒久管理し、別リポジトリへ分割
 - Repository CMS本体とは別責務として扱う
 - ルート直下の `ServerSideLogicFramework/` で管理する
 - フレームワーク専用ドキュメントは `ServerSideLogicFramework/Docs/` で管理する
-- フレームワーク関係の実装コードを `ServerSideLogicFramework/` へ分離配置する
+- フレームワーク関係の実装コードは `ServerSideLogicFramework/ServerSideLogicFramework.php` の単一ファイル原則とする
 - 別リポジトリ分割を前提にせず、CMS本体と責務を混在させない
 - 採用する場合、Repository CMSは本フレームワークの仕様および機能に準拠する
 - Repository CMS本体のTypeScript/JavaScript製移行計画および凍結中の開発計画案より、本フレームワークの原型作成、強化、安定版作成を優先する
@@ -43,9 +43,9 @@ JSON API、REST API、内部API、fetch前提の処理を持たない。
 
 # 4. 単一エントリーポイント
 
-Repository CMSで採用する場合、すべてのHTTPアクセスは `Core/app.php` を経由する。
+Repository CMSで採用する場合、すべてのHTTPアクセスは `RepositoryCMS/Core/app.php` を経由する。
 
-`Core/app.php` は、サーバーサイドロジックフレームワークとTypeScript/JavaScript製CMSフロントサイドの連携システムとして位置付ける。
+`RepositoryCMS/Core/app.php` は、サーバーサイドロジックフレームワークとTypeScript/JavaScript製CMSフロントサイドの連携システムとして位置付ける。
 
 ---
 
@@ -97,9 +97,9 @@ Repository CMSで採用する場合、すべてのHTTPアクセスは `Core/app.
 
 # 8. 分離実装計画
 
-ServerSideLogicFramework/ 直下へ、サーバーサイドロジックフレームワーク関係の実装コードを分離配置する。
+サーバーサイドロジックフレームワーク関係の実装コードは、ServerSideLogicFramework/ServerSideLogicFramework.php に集約する。
 
-Repository CMS本体側には、サーバーサイドロジックフレームワーク関係の実装コード実体を残さない。
+Repository CMS本体側およびServerSideLogicFramework/直下の別PHPファイルには、サーバーサイドロジックフレームワーク関係の実装コード実体を残さない。
 
 分離実装計画では、現在までのRepository CMS実装を分析対象とし、以下を整理する。
 
@@ -132,15 +132,15 @@ Server Side Logic Frameworkは、以下の段階で進める。
 
 ## Phase 3: 原型仕様確定
 
-原型で扱う最小機能、扱わない機能、Core/app.phpとの連携前提を確定する。
+原型で扱う最小機能、扱わない機能、RepositoryCMS/Core/app.phpとの連携前提を確定する。
 
 原型仕様確定後、フレームワーク対象コードはServerSideLogicFramework/へ分離配置する。
 
 ## Phase 4: 分離実装
 
-ServerSideLogicFramework/ 直下へ、認証、認可、ロック、CSRF、アップデート、作業データ保全の実装を配置する。
+ServerSideLogicFramework/ServerSideLogicFramework.php へ、認証、認可、ロック、CSRF、アップデート、作業データ保全の実装を配置する。
 
-配置後、Repository CMS本体側にフレームワーク関係コード実体を残さない。
+配置後、Repository CMS本体側およびServerSideLogicFramework/直下の別PHPファイルにフレームワーク関係コード実体を残さない。
 
 ## Phase 5: 強化
 
@@ -159,6 +159,8 @@ ServerSideLogicFramework/ 直下へ、認証、認可、ロック、CSRF、ア�
 Repository CMS本体のTypeScript/JavaScript製移行計画および凍結中の開発計画案は進めない。
 
 Repository CMS本体は、Server Side Logic Frameworkの仕様および機能に準拠して開発する。
+
+Repository CMS本体は、フレームワーク内部クラスを直接呼び出さず、Runtimeが保持するServerSideLogicFramework窓口を通じて安全制御を利用する。
 
 ---
 
@@ -224,15 +226,11 @@ Server Side Logic Frameworkは、安定版ができるまで以下を継続す�
 
 # 14. 分離実装
 
-分離実装では、以下をサーバーサイド安全制御フレームワークとする。
+分離実装では、以下の単一ファイルをサーバーサイド安全制御フレームワークとする。
 
 - ServerSideLogicFramework/ServerSideLogicFramework.php
-- ServerSideLogicFramework/Auth.php
-- ServerSideLogicFramework/LockManager.php
-- ServerSideLogicFramework/Security.php
-- ServerSideLogicFramework/UpdateApplier.php
-- ServerSideLogicFramework/UpdateValidator.php
-- ServerSideLogicFramework/WorkData.php
+
+ServerSideLogicFramework/ServerSideLogicFramework.php には、フレームワーク内部クラスをすべて集約する。
 
 フレームワークは以下を担当する。
 
@@ -250,6 +248,8 @@ Server Side Logic Frameworkは、安定版ができるまで以下を継続す�
 
 フレームワークはAPIサーバーではない。
 
-フレームワークはCore/App/Bootstrap.phpからオートロードされ、Core/App/Runtime.phpで保持される。
+フレームワークはRepositoryCMS/Core/App/Bootstrap.phpからオートロードされ、RepositoryCMS/Core/App/Runtime.phpで保持される。
 
 Repository CMS本体は、フレームワーク仕様および機能に準拠して開発する。
+
+Repository CMS本体から利用する公開窓口は ServerSideLogicFramework クラスとし、内部クラスは単一ファイル内の実装詳細として扱う。
