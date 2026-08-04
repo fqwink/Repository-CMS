@@ -29,7 +29,7 @@ final class Auth
 
     public function configured(): bool
     {
-        return is_file($this->authFile);
+        return $this->users() !== [];
     }
 
     public function setup(string $username, string $password): void
@@ -42,7 +42,56 @@ final class Auth
         if ($passwordHash === false) {
             throw new \RuntimeException('パスワードをハッシュ化できません。');
         }
-        $this->writeAuth($username, $passwordHash);
+        $this->writeUsers([[
+            'username' => trim($username),
+            'password_hash' => $passwordHash,
+            'role' => 'admin',
+            'created_at' => gmdate(DATE_ATOM),
+        ]]);
+    }
+
+    public function createUser(string $username, string $password, string $role): void
+    {
+        $username = trim($username);
+        $role = strtolower(trim($role));
+        if (!in_array($role, ['admin', 'editor'], true)) {
+            throw new \InvalidArgumentException('ロールが不正です。');
+        }
+        $users = $this->usersWithHashes();
+        foreach ($users as $user) {
+            if (hash_equals((string) $user['username'], $username)) {
+                throw new \RuntimeException('同じユーザー名は使用できません。');
+            }
+        }
+        $adminCount = count(array_filter($users, static fn (array $user): bool => ($user['role'] ?? '') === 'admin'));
+        $editorCount = count(array_filter($users, static fn (array $user): bool => ($user['role'] ?? '') === 'editor'));
+        if ($role === 'admin' && $adminCount >= 1) {
+            throw new \RuntimeException('管理者は1人までです。');
+        }
+        if ($role === 'editor' && $editorCount >= 2) {
+            throw new \RuntimeException('編集担当は2人までです。');
+        }
+        $this->assertPasswordAllowed($password);
+        $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+        if ($passwordHash === false) {
+            throw new \RuntimeException('パスワードをハッシュ化できません。');
+        }
+        $users[] = [
+            'username' => $username,
+            'password_hash' => $passwordHash,
+            'role' => $role,
+            'created_at' => gmdate(DATE_ATOM),
+        ];
+        $this->writeUsers($users);
+    }
+
+    public function users(): array
+    {
+        return array_map(static fn (array $user): array => [
+            'username' => (string) $user['username'],
+            'role' => (string) $user['role'],
+            'created_at' => (string) ($user['created_at'] ?? ''),
+        ], $this->usersWithHashes());
     }
 
     public function login(string $username, string $password): bool
@@ -50,8 +99,8 @@ final class Auth
         if ($this->loginLocked()) {
             throw new \RuntimeException('ログイン失敗が多いため一時ロックされています。');
         }
-        $data = $this->readAuth();
-        if ($data === null || !hash_equals($data['username'], $username)) {
+        $data = $this->findUser($username);
+        if ($data === null) {
             $this->recordLoginFailure();
             return false;
         }
@@ -61,10 +110,12 @@ final class Auth
         }
         $this->clearLoginState();
         $_SESSION['admin'] = $data['username'];
+        $_SESSION['role'] = $data['role'];
         $_SESSION['authenticated_at'] = time();
         $_SESSION['last_seen_at'] = time();
         if (!session_regenerate_id(true)) {
             unset($_SESSION['admin']);
+            unset($_SESSION['role']);
             unset($_SESSION['authenticated_at'], $_SESSION['last_seen_at']);
             throw new \RuntimeException('セッションIDを再生成できません。');
         }
@@ -102,6 +153,23 @@ final class Auth
         return isset($_SESSION['admin']) ? (string) $_SESSION['admin'] : null;
     }
 
+    public function role(): ?string
+    {
+        if ($this->user() === null) {
+            return null;
+        }
+        $role = (string) ($_SESSION['role'] ?? '');
+        if ($role !== '') {
+            return $role;
+        }
+        $user = $this->findUser((string) $_SESSION['admin']);
+        if ($user === null) {
+            return null;
+        }
+        $_SESSION['role'] = $user['role'];
+        return $user['role'];
+    }
+
     public function loginLocked(): bool
     {
         $state = $this->readLoginState();
@@ -132,35 +200,72 @@ final class Auth
         }
     }
 
-    private function readAuth(): ?array
+    private function findUser(string $username): ?array
+    {
+        foreach ($this->usersWithHashes() as $user) {
+            if (hash_equals((string) $user['username'], $username)) {
+                return $user;
+            }
+        }
+        return null;
+    }
+
+    private function usersWithHashes(): array
     {
         if (!is_file($this->authFile)) {
-            return null;
+            return [];
         }
         $bytes = file_get_contents($this->authFile);
         if ($bytes === false) {
-            return null;
+            return [];
         }
         $data = json_decode($bytes, true);
-        if (!is_array($data) || !isset($data['username'], $data['password_hash'])) {
-            return null;
+        if (!is_array($data)) {
+            return [];
         }
-        if (!is_string($data['username']) || !is_string($data['password_hash'])) {
-            return null;
+        if (isset($data['username'], $data['password_hash']) && is_string($data['username']) && is_string($data['password_hash'])) {
+            return [[
+                'username' => (string) $data['username'],
+                'password_hash' => (string) $data['password_hash'],
+                'role' => 'admin',
+                'created_at' => (string) ($data['created_at'] ?? ''),
+            ]];
         }
-        return ['username' => (string) $data['username'], 'password_hash' => (string) $data['password_hash']];
+        $users = $data['users'] ?? null;
+        if (!is_array($users)) {
+            return [];
+        }
+        $normalized = [];
+        foreach ($users as $user) {
+            if (!is_array($user)) {
+                continue;
+            }
+            $username = (string) ($user['username'] ?? '');
+            $hash = (string) ($user['password_hash'] ?? '');
+            $role = (string) ($user['role'] ?? '');
+            if ($username === '' || $hash === '' || !in_array($role, ['admin', 'editor'], true)) {
+                continue;
+            }
+            $normalized[] = [
+                'username' => $username,
+                'password_hash' => $hash,
+                'role' => $role,
+                'created_at' => (string) ($user['created_at'] ?? ''),
+            ];
+        }
+        return $normalized;
     }
 
-    private function writeAuth(string $username, string $passwordHash): void
+    private function writeUsers(array $users): void
     {
-        $username = trim($username);
-        if ($username === '' || strlen($passwordHash) < 20) {
-            throw new \InvalidArgumentException('管理者情報が不正です。');
+        foreach ($users as $user) {
+            if ((string) ($user['username'] ?? '') === '' || strlen((string) ($user['password_hash'] ?? '')) < 20 || !in_array((string) ($user['role'] ?? ''), ['admin', 'editor'], true)) {
+                throw new \InvalidArgumentException('ユーザー情報が不正です。');
+            }
         }
         $payload = json_encode([
-            'username' => $username,
-            'password_hash' => $passwordHash,
-            'created_at' => gmdate(DATE_ATOM),
+            'users' => array_values($users),
+            'updated_at' => gmdate(DATE_ATOM),
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 
         if ($payload === false || file_put_contents($this->authFile, $payload, LOCK_EX) === false) {

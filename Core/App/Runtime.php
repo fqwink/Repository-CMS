@@ -9,7 +9,7 @@ final class Runtime
     public function __construct(
         public readonly string $coreRoot,
         public readonly string $appRoot,
-        public readonly string $dataRoot,
+        public readonly string $configRoot,
         public readonly string $workRoot,
         public readonly Config $config,
         public readonly LockManager $locks,
@@ -23,30 +23,28 @@ final class Runtime
     {
         $root = dirname($coreRoot);
         $appRoot = $coreRoot . '/App';
-        $dataRoot = $coreRoot . '/Data';
+        $configRoot = $coreRoot . '/Config';
         $workRoot = $root . '/Work';
-        self::ensureDirectory($coreRoot . '/Config');
-        self::ensureDirectory($dataRoot);
-        self::ensureDirectory($dataRoot . '/auth');
-        self::ensureDirectory($dataRoot . '/locks');
-        self::ensureDirectory($dataRoot . '/theme');
+        self::ensureDirectory($configRoot);
+        self::ensureDirectory($appRoot . '/Lang');
+        self::ensureDirectory($appRoot . '/Themes');
         self::ensureDirectory($workRoot);
 
         $config = Config::fromEnvironment();
-        $locks = new LockManager($dataRoot . '/locks');
+        $locks = new LockManager($configRoot . '/cms_lock.json');
         $workData = new WorkData($workRoot, $locks);
         $git = GitHubProvider::fromConfig($config, $locks);
 
         return new self(
             $coreRoot,
             $appRoot,
-            $dataRoot,
+            $configRoot,
             $workRoot,
             $config,
             $locks,
             $workData,
             $git,
-            new Auth($dataRoot . '/auth/admin.json', $dataRoot . '/auth/login_state.json'),
+            new Auth($configRoot . '/auth.json', $configRoot . '/login_state.json'),
         );
     }
 

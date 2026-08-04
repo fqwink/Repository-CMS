@@ -6,7 +6,7 @@ namespace RepositoryCms\Core;
 
 final class Config
 {
-    public const VERSION = 'v.0.7';
+    public const VERSION = 'v.0.11';
 
     public function __construct(
         public readonly string $provider,

@@ -6,32 +6,8 @@ namespace RepositoryCms\Core;
 
 final class StaticGenerator
 {
-    private const THEMES = [
-        'standard' => [
-            'name' => 'standard',
-            'label' => 'Standard',
-            'description' => '汎用サイト向け',
-            'primary' => '#00a968',
-            'secondary' => '#3498db',
-            'accent' => '#40AAEF',
-        ],
-        'blog' => [
-            'name' => 'blog',
-            'label' => 'Blog',
-            'description' => '記事中心サイト向け',
-            'primary' => '#3498db',
-            'secondary' => '#00a968',
-            'accent' => '#40AAEF',
-        ],
-        'media' => [
-            'name' => 'media',
-            'label' => 'Media',
-            'description' => '情報発信・広告枠想定サイト向け',
-            'primary' => '#40AAEF',
-            'secondary' => '#00a968',
-            'accent' => '#58BE89',
-        ],
-    ];
+    private const THEME_NAMES = ['standard', 'blog', 'media'];
+    private static ?array $themeCache = null;
 
     public function __construct(private readonly Runtime $runtime, private readonly Renderer $renderer)
     {
@@ -39,12 +15,34 @@ final class StaticGenerator
 
     public static function themes(): array
     {
-        return self::THEMES;
+        if (self::$themeCache !== null) {
+            return self::$themeCache;
+        }
+
+        $themes = [];
+        foreach (self::THEME_NAMES as $name) {
+            $path = __DIR__ . '/Themes/' . $name . '.json';
+            if (!is_file($path)) {
+                throw new \RuntimeException('標準テーマ定義が存在しません: ' . $name);
+            }
+            $bytes = file_get_contents($path);
+            if ($bytes === false) {
+                throw new \RuntimeException('標準テーマ定義を読み取れません: ' . $name);
+            }
+            $theme = json_decode($bytes, true);
+            if (!is_array($theme) || !self::validThemeSource($name, $theme)) {
+                throw new \RuntimeException('標準テーマ定義が不正です: ' . $name);
+            }
+            $themes[$name] = $theme;
+        }
+
+        self::$themeCache = $themes;
+        return self::$themeCache;
     }
 
     public static function validTheme(string $theme): bool
     {
-        return isset(self::THEMES[$theme]);
+        return isset(self::themes()[$theme]);
     }
 
     public function generate(): int
@@ -162,7 +160,7 @@ final class StaticGenerator
 
     private function activeThemeName(): string
     {
-        $path = $this->runtime->dataRoot . '/theme/active.json';
+        $path = $this->runtime->configRoot . '/theme.json';
         if (!is_file($path)) {
             return 'standard';
         }
@@ -182,7 +180,7 @@ final class StaticGenerator
 
     private function activeTheme(): array
     {
-        $theme = self::THEMES[$this->activeThemeName()] ?? null;
+        $theme = self::themes()[$this->activeThemeName()] ?? null;
         if (!is_array($theme) || !$this->validThemeDefinition($theme)) {
             $this->runtime->locks->lock('テーマを検証できません。');
             throw new \RuntimeException('テーマを検証できません。');
@@ -192,6 +190,14 @@ final class StaticGenerator
 
     private function validThemeDefinition(array $theme): bool
     {
+        return self::validThemeSource((string) ($theme['name'] ?? ''), $theme);
+    }
+
+    private static function validThemeSource(string $name, array $theme): bool
+    {
+        if ($name === '' || !in_array($name, self::THEME_NAMES, true)) {
+            return false;
+        }
         foreach (['name', 'label', 'description', 'primary', 'secondary', 'accent'] as $key) {
             if (!isset($theme[$key]) || !is_string($theme[$key]) || $theme[$key] === '') {
                 return false;
@@ -202,7 +208,7 @@ final class StaticGenerator
                 return false;
             }
         }
-        return self::validTheme($theme['name']);
+        return $theme['name'] === $name;
     }
 
     private function wrapHtml(string $sourcePath, string $content, array $theme): string

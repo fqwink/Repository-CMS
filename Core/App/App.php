@@ -55,6 +55,10 @@ final class App
                 'themes' => $this->themes(),
                 'theme_save' => $this->saveTheme(),
                 'updates' => $this->updates(),
+                'update_validate' => $this->validateUpdate(),
+                'update_apply' => $this->applyUpdate(),
+                'users' => $this->users(),
+                'user_create' => $this->createUser(),
                 default => $this->index(),
             };
         } catch (\Throwable $error) {
@@ -126,6 +130,7 @@ final class App
         $gitConfigured = $this->runtime->git->configured();
         $updateConfigured = $this->runtime->config->updateConfigured();
         $authState = $this->runtime->auth->user() === null ? '未認証' : '認証済み';
+        $role = $this->runtime->auth->role() ?? '-';
 
         $cards = [
             ['CMS状態', $locked ? 'ロック中' : '通常稼働', $locked ? 'danger' : 'ok'],
@@ -133,7 +138,7 @@ final class App
             ['メンテナンス状態', $maintenance ? 'メンテナンス中' : '通常', $maintenance ? 'warn' : 'ok'],
             ['Gitプロバイダー', $gitConfigured ? '設定済み' : '未設定', $gitConfigured ? 'ok' : 'danger'],
             ['アップデート設定', $updateConfigured ? '設定済み' : '未設定', $updateConfigured ? 'ok' : 'warn'],
-            ['認証状態', $authState, $this->runtime->auth->user() === null ? 'warn' : 'ok'],
+            ['認証状態', $authState . ' / ' . $role, $this->runtime->auth->user() === null ? 'warn' : 'ok'],
         ];
 
         $html = '<section class="dashboard-grid" aria-label="CMS状態">';
@@ -150,12 +155,14 @@ final class App
     private function operationPanel(bool $locked): string
     {
         $disabledNote = $locked ? '<p class="muted">CMSロック中は、状態確認、ログアウト、アップデート状態確認以外の操作は制限されます。</p>' : '';
+        $admin = $this->runtime->auth->role() === 'admin';
         $links = [
             ['作成', '?action=new', '新しいコンテンツを作成します。', !$locked],
             ['静的生成', '?action=generate', 'コンテンツから公開成果物を生成します。', !$locked],
-            ['公開', '?action=publish', '生成成果物を公開リポジトリへ保存します。', !$locked],
-            ['テーマ', '?action=themes', '静的生成で使用するテーマを選択します。', !$locked],
-            ['アップデート', '?action=updates', '開発元リリースを確認します。', true],
+            ['公開', '?action=publish', '生成成果物を公開リポジトリへ保存します。', !$locked && $admin],
+            ['テーマ', '?action=themes', '静的生成で使用するテーマを選択します。', !$locked && $admin],
+            ['アップデート', '?action=updates', '開発元リリースを確認します。', $admin],
+            ['ユーザー', '?action=users', '管理者と編集担当を管理します。', !$locked && $admin],
         ];
         $html = '<section class="panel"><div class="section-title"><h2>操作</h2><span class="badge">運用</span></div>' . $disabledNote . '<div class="action-grid">';
         foreach ($links as [$label, $href, $description, $enabled]) {
@@ -366,36 +373,92 @@ final class App
 
     private function themeSettingsPath(): string
     {
-        $directory = $this->runtime->dataRoot . '/theme';
-        if (!is_dir($directory) && !mkdir($directory, 0700, true) && !is_dir($directory)) {
-            $this->runtime->locks->lock('テーマ設定ディレクトリを作成できません。');
-            throw new \RuntimeException('テーマ設定ディレクトリを作成できません。');
-        }
-        return $directory . '/active.json';
+        return $this->runtime->configRoot . '/theme.json';
     }
 
     private function updates(): void
     {
-        $rows = '';
-        $message = '';
-        $summary = '<div class="summary-grid"><div><span>アップデート設定</span><strong>' . Response::escape($this->runtime->config->updateConfigured() ? '設定済み' : '未設定') . '</strong></div><div><span>リポジトリ</span><strong>' . Response::escape($this->runtime->config->updateRepository === '' ? '-' : $this->runtime->config->updateRepository) . '</strong></div><div><span>ブランチ</span><strong>' . Response::escape($this->runtime->config->updateBranch) . '</strong></div><div><span>マニフェスト</span><strong>' . Response::escape($this->runtime->config->updateManifestPath) . '</strong></div></div>';
         try {
-            foreach ($this->availableUpdateReleases() as $release) {
-                $version = (string) ($release['version'] ?? '');
-                $releasedAt = (string) ($release['released_at'] ?? '');
-                $php = (string) ($release['php'] ?? '');
-                $targetVersion = (string) ($release['target_version'] ?? '');
-                $fileCount = is_array($release['files'] ?? null) ? count($release['files']) : 0;
-                $rows .= '<tr><td>' . Response::escape($version) . '</td><td>' . Response::escape($targetVersion === '' ? '-' : $targetVersion) . '</td><td>' . Response::escape($releasedAt) . '</td><td>' . Response::escape($php === '' ? '-' : $php) . '</td><td>' . $fileCount . '</td><td><span class="badge">通知のみ</span></td></tr>';
-            }
+            $rows = $this->updateRows($this->availableUpdateReleases(), true);
+            $message = '';
         } catch (\Throwable $error) {
+            $rows = '';
             $message = '<div class="alert">' . Response::escape($error->getMessage()) . '</div>';
         }
         if ($rows === '') {
-            $rows = '<tr><td colspan="6" class="muted">利用可能なアップデートはありません。</td></tr>';
+            $rows = '<tr><td colspan="7" class="muted">利用可能なアップデートはありません。</td></tr>';
         }
-        $body = $message . '<section class="panel"><h2>アップデート</h2><p class="muted">v.0.7では開発元リリースの通知と一覧表示のみを行います。選択、事前検証、適用はv.0.8以降で扱います。</p>' . $summary . '<table class="list"><tr><th>バージョン</th><th>対象</th><th>リリース日時</th><th>必須PHP</th><th>ファイル数</th><th>状態</th></tr>' . $rows . '</table></section>';
+        $body = $message . '<section class="panel"><h2>アップデート</h2><p class="muted">任意リリースを選択し、事前検証後に適用します。適用時はメンテナンス状態に切り替わります。</p>' . $this->updateSummaryHtml() . '<table class="list"><tr><th>バージョン</th><th>対象</th><th>リリース日時</th><th>必須PHP</th><th>ファイル数</th><th>状態</th><th>操作</th></tr>' . $rows . '</table></section>';
         Response::html('アップデート', $body, $this->runtime);
+    }
+
+    private function validateUpdate(): void
+    {
+        if ($this->requestMethod() !== 'POST') {
+            Response::redirect('?action=updates');
+        }
+        Security::requireCsrf();
+        $version = (string) ($_POST['version'] ?? '');
+        $release = $this->findUpdateRelease($version);
+        $report = (new UpdateValidator($this->runtime))->validate($release);
+        $this->audit('update.validate', [
+            'version' => $version,
+            'valid' => $report['valid'],
+            'failed' => $report['failed'],
+            'user' => $this->runtime->auth->user(),
+        ]);
+        $body = '<section class="panel"><div class="section-title"><h2>アップデート事前検証</h2><a class="button secondary" href="?action=updates">一覧へ戻る</a></div>'
+            . $this->updateValidationReportHtml($report)
+            . '</section>';
+        Response::html('アップデート事前検証', $body, $this->runtime);
+    }
+
+    private function applyUpdate(): void
+    {
+        if ($this->requestMethod() !== 'POST') {
+            Response::redirect('?action=updates');
+        }
+        Security::requireCsrf();
+        $version = (string) ($_POST['version'] ?? '');
+        $release = $this->findUpdateRelease($version);
+        $report = (new UpdateApplier($this->runtime, self::MAINTENANCE_RELEASE_WAIT_REASON))->apply($release);
+        $this->audit('update.apply', [
+            'version' => $version,
+            'valid' => $report['valid'],
+            'failed' => $report['failed'],
+            'user' => $this->runtime->auth->user(),
+        ]);
+        $body = '<section class="panel"><h2>アップデート適用</h2>'
+            . $this->updateValidationReportHtml($report)
+            . '<p class="muted">問題がない場合、5分後に公開モードへ復帰します。</p></section>';
+        Response::html('アップデート適用', $body, $this->runtime);
+    }
+
+    private function users(): void
+    {
+        $rows = '';
+        foreach ($this->runtime->auth->users() as $user) {
+            $rows .= '<tr><td>' . Response::escape((string) $user['username']) . '</td><td>' . Response::escape((string) $user['role']) . '</td><td>' . Response::escape((string) $user['created_at']) . '</td></tr>';
+        }
+        if ($rows === '') {
+            $rows = '<tr><td colspan="3" class="muted">ユーザーはありません。</td></tr>';
+        }
+        $body = '<section class="panel"><h2>ユーザー</h2><p class="muted">管理者1人、編集担当2人まで作成できます。</p><table class="list"><tr><th>ユーザー名</th><th>ロール</th><th>作成日時</th></tr>' . $rows . '</table></section>'
+            . '<section class="panel"><h2>ユーザー作成</h2><form method="post" action="?action=user_create"><input type="hidden" name="csrf" value="' . Security::csrfToken() . '"><label>ユーザー名</label><input name="username" required><label>ロール</label><select name="role"><option value="editor">編集担当</option><option value="admin">管理者</option></select><label>パスワード</label><input name="password" type="password" required><p><button>作成</button></p></form></section>';
+        Response::html('ユーザー', $body, $this->runtime);
+    }
+
+    private function createUser(): void
+    {
+        if ($this->requestMethod() !== 'POST') {
+            Response::redirect('?action=users');
+        }
+        Security::requireCsrf();
+        $username = (string) ($_POST['username'] ?? '');
+        $role = (string) ($_POST['role'] ?? '');
+        $this->runtime->auth->createUser($username, (string) ($_POST['password'] ?? ''), $role);
+        $this->audit('user.create', ['created_user' => $username, 'role' => $role, 'user' => $this->runtime->auth->user()]);
+        Response::redirect('?action=users');
     }
 
     private function audit(string $type, array $data = []): void
@@ -435,6 +498,9 @@ final class App
             }
             throw new \RuntimeException('認証が必要です。');
         }
+        if (!$this->roleAllowed($action)) {
+            throw new \RuntimeException('この操作を行う権限がありません。');
+        }
         if (!$this->runtime->locks->locked()) {
             return;
         }
@@ -461,11 +527,30 @@ final class App
             'themes',
             'theme_save',
             'updates',
+            'update_validate',
+            'update_apply',
+            'users',
+            'user_create',
         ], true);
+    }
+
+    private function roleAllowed(string $action): bool
+    {
+        $role = $this->runtime->auth->role();
+        if ($role === 'admin') {
+            return true;
+        }
+        if ($role === 'editor') {
+            return in_array($action, ['index', 'logout', 'new', 'edit', 'save', 'history', 'restore', 'preview', 'generate'], true);
+        }
+        return in_array($action, ['index', 'login'], true);
     }
 
     private function updateNotice(): string
     {
+        if ($this->runtime->auth->role() !== 'admin') {
+            return '';
+        }
         try {
             $count = count($this->availableUpdateReleases());
         } catch (\Throwable) {
@@ -475,6 +560,63 @@ final class App
             return '';
         }
         return '<div class="notice">利用可能なアップデートがあります。<a href="?action=updates">アップデート一覧</a></div>';
+    }
+
+    private function updateSummaryHtml(): string
+    {
+        return '<div class="summary-grid"><div><span>アップデート設定</span><strong>' . Response::escape($this->runtime->config->updateConfigured() ? '設定済み' : '未設定') . '</strong></div><div><span>リポジトリ</span><strong>' . Response::escape($this->runtime->config->updateRepository === '' ? '-' : $this->runtime->config->updateRepository) . '</strong></div><div><span>ブランチ</span><strong>' . Response::escape($this->runtime->config->updateBranch) . '</strong></div><div><span>マニフェスト</span><strong>' . Response::escape($this->runtime->config->updateManifestPath) . '</strong></div></div>';
+    }
+
+    private function updateRows(array $releases, bool $withForm): string
+    {
+        $rows = '';
+        foreach ($releases as $release) {
+            $version = (string) ($release['version'] ?? '');
+            $releasedAt = (string) ($release['released_at'] ?? '');
+            $php = (string) ($release['php'] ?? '');
+            $targetVersion = (string) ($release['target_version'] ?? '');
+            $fileCount = is_array($release['files'] ?? null) ? count($release['files']) : 0;
+            $operation = '<span class="muted">-</span>';
+            if ($withForm) {
+                $operation = '<form method="post" action="?action=update_validate"><input type="hidden" name="csrf" value="' . Security::csrfToken() . '"><input type="hidden" name="version" value="' . Response::escape($version) . '"><button>事前検証</button></form>';
+            }
+            $rows .= '<tr><td>' . Response::escape($version) . '</td><td>' . Response::escape($targetVersion === '' ? '-' : $targetVersion) . '</td><td>' . Response::escape($releasedAt) . '</td><td>' . Response::escape($php === '' ? '-' : $php) . '</td><td>' . $fileCount . '</td><td><span class="badge">検証可能</span></td><td>' . $operation . '</td></tr>';
+        }
+        return $rows;
+    }
+
+    private function findUpdateRelease(string $version): array
+    {
+        if ($version === '') {
+            throw new \InvalidArgumentException('アップデートリリースが選択されていません。');
+        }
+        foreach ($this->availableUpdateReleases() as $release) {
+            if ((string) ($release['version'] ?? '') === $version) {
+                return $release;
+            }
+        }
+        throw new \RuntimeException('選択されたアップデートリリースを確認できません。');
+    }
+
+    private function updateValidationReportHtml(array $report): string
+    {
+        $summary = '<div class="summary-grid"><div><span>検証対象</span><strong>' . Response::escape((string) ($report['version'] ?? '-')) . '</strong></div><div><span>対象バージョン</span><strong>' . Response::escape((string) ($report['target_version'] ?? '-')) . '</strong></div><div><span>検証成功</span><strong>' . (int) ($report['passed'] ?? 0) . '</strong></div><div><span>検証失敗</span><strong>' . (int) ($report['failed'] ?? 0) . '</strong></div></div>';
+        $status = ($report['valid'] ?? false) === true
+            ? '<div class="notice">検証は成功しました。</div>'
+            : '<div class="alert">事前検証に失敗しました。適用は行いません。</div>';
+        $rows = '';
+        foreach (($report['checks'] ?? []) as $check) {
+            $ok = ($check['ok'] ?? false) === true;
+            $rows .= '<tr><td>' . Response::escape((string) ($check['name'] ?? '')) . '</td><td><span class="badge">' . Response::escape($ok ? 'OK' : 'NG') . '</span></td><td>' . Response::escape((string) ($check['message'] ?? '')) . '</td></tr>';
+        }
+        if ($rows === '') {
+            $rows = '<tr><td colspan="3" class="muted">検証項目はありません。</td></tr>';
+        }
+        $apply = '';
+        if (($report['valid'] ?? false) === true && isset($report['version']) && $this->runtime->auth->role() === 'admin') {
+            $apply = '<form method="post" action="?action=update_apply"><input type="hidden" name="csrf" value="' . Security::csrfToken() . '"><input type="hidden" name="version" value="' . Response::escape((string) $report['version']) . '"><button>アップデート適用</button></form>';
+        }
+        return $status . $summary . '<table class="list"><tr><th>項目</th><th>状態</th><th>内容</th></tr>' . $rows . '</table>' . $apply;
     }
 
     private function availableUpdateReleases(): array
@@ -510,7 +652,7 @@ final class App
             if (!is_array($file)) {
                 return false;
             }
-            if ((string) ($file['path'] ?? '') === '' || (string) ($file['checksum'] ?? '') === '') {
+            if ((string) ($file['path'] ?? '') === '' || (string) ($file['source'] ?? '') === '' || (string) ($file['checksum'] ?? '') === '') {
                 return false;
             }
         }

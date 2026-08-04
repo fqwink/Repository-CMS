@@ -8,9 +8,9 @@ final class LockManager
 {
     private string $lockFile;
 
-    public function __construct(string $lockRoot)
+    public function __construct(string $lockFile)
     {
-        $this->lockFile = $lockRoot . '/cms.lock.json';
+        $this->lockFile = $lockFile;
     }
 
     public function lock(string $reason): void
@@ -23,6 +23,9 @@ final class LockManager
         $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         if ($json === false || file_put_contents($this->lockFile, $json, LOCK_EX) === false) {
             throw new \RuntimeException('CMSロック状態を書き込めません。');
+        }
+        if (!chmod($this->lockFile, 0600)) {
+            throw new \RuntimeException('CMSロック状態の権限を設定できません。');
         }
     }
 
