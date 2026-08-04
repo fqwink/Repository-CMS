@@ -23,7 +23,11 @@ Repository CMSリポジトリ内で恒久管理し、別リポジトリへ分割
 - データ保全とセキュリティを最優先、最重視する
 - ルート直下の `ServerSideLogicFramework/` で管理する
 - フレームワーク専用ドキュメントは `ServerSideLogicFramework/Docs/` で管理する
-- フレームワーク関係の実装コードは `ServerSideLogicFramework/ServerSideLogicFramework.php` の単一ファイル原則とする
+- フレームワーク本体は `ServerSideLogicFramework/ServerSideLogicFramework.php` の単一ファイル原則とする
+- ServerSideLogicFrameworkクライアントツール正本は `ServerSideLogicFramework/ServerSideLogicFrameworkClient.php` の単一ファイル原則とする
+- Repository CMSとの連携は単一エントリーポイント経由方式を廃止し、クライアントツール経由の内部API方式とする
+- Repository CMSはServerSideLogicFrameworkクライアントツールを組み込まない場合、起動および動作してはならない
+- ServerSideLogicFramework本体およびクライアントツールは、ServerSideLogicFramework開発元のみが開発、修正、保守、メンテナンス、配布する
 - 別リポジトリ分割を前提にせず、CMS本体と責務を混在させない
 - 採用する場合、Repository CMSは本フレームワークの仕様および機能に準拠する
 - Repository CMS本体のTypeScript/JavaScript製移行計画および凍結中の開発計画案より、本フレームワークの原型作成、強化、安定版作成を優先する
@@ -84,7 +88,7 @@ ServerSideLogicFrameworkは、その操作を安全に実行してよいかを�
 
 Repository CMSは、ServerSideLogicFrameworkに準拠して開発する。
 
-Repository CMSは、ServerSideLogicFramework内部クラスを直接呼び出さず、Runtimeが保持する公開窓口を通じて安全制御を利用する。
+Repository CMSは、ServerSideLogicFramework内部クラスを直接呼び出さず、CMS側へ組み込まれたServerSideLogicFrameworkクライアントツールを通じて内部APIを利用する。
 
 ServerSideLogicFrameworkは、Repository CMSの操作に対してサーバーサイド最終判定を行う。
 
@@ -96,19 +100,49 @@ Repository CMSとServerSideLogicFrameworkのどちらも、利用者のデータ
 
 # 3. 実行方針
 
-サーバーサイドロジックフレームワークは、APIサーバーとして扱わない。
+サーバーサイドロジックフレームワークは、外部公開APIサーバーとして扱わない。
 
-JSON API、REST API、内部API、fetch前提の処理を持たない。
+JSON外部API、REST外部API、fetch前提の外部公開APIを持たない。
 
-ページ要求およびフォームPOSTの範囲で、サーバーサイド安全制御を担当する。
+Repository CMSとの連携では、ServerSideLogicFrameworkクライアントツール経由の内部API実行環境を持つ。
+
+内部APIはServerSideLogicFrameworkの安全制御を実行するための非公開連携方式であり、外部公開APIとして扱わない。
 
 ---
 
-# 4. 単一エントリーポイント
+# 4. 内部API経由方式
 
-Repository CMSで採用する場合、すべてのHTTPアクセスは `RepositoryCMS/Core/app.php` を経由する。
+Repository CMSとの連携は、単一エントリーポイント経由方式を廃止し、内部API経由方式へ変更する。
 
-`RepositoryCMS/Core/app.php` は、サーバーサイドロジックフレームワークとTypeScript/JavaScript製CMSフロントサイドの連携システムとして位置付ける。
+ServerSideLogicFrameworkは内部API実行環境を持つ。
+
+Repository CMSは、ServerSideLogicFrameworkクライアントツールをCoreへ組み込む。
+
+Repository CMSからServerSideLogicFrameworkへのアクセスは、Coreへ組み込まれたServerSideLogicFrameworkクライアントツール経由のみとする。
+
+ServerSideLogicFrameworkクライアントツールが未組み込みの場合、Repository CMSは起動および動作してはならない。
+
+Repository CMSは、ServerSideLogicFramework本体および内部クラスを直接呼び出してはならない。
+
+---
+
+# 4.1 クライアントツール正本
+
+ServerSideLogicFrameworkクライアントツール正本は、ServerSideLogicFramework/ServerSideLogicFrameworkClient.php とする。
+
+ServerSideLogicFrameworkクライアントツール正本は、単一ファイル原則とする。
+
+Repository CMSは、ServerSideLogicFrameworkクライアントツール正本をコピーしてCoreへ組み込まなければならない。
+
+Repository CMS側の組み込み先は RepositoryCMS/Core/ServerSideLogicFrameworkClient.php とする。
+
+Repository CMSは、独自作成、独自改変、部分改変、再実装したクライアントツールを使用してはならない。
+
+CMS側クライアントツールが未配置、破損、改変、不一致、互換性不一致、出所不明、署名不一致、チェックサム不一致の場合、Repository CMSは起動および動作してはならない。
+
+ServerSideLogicFramework本体およびServerSideLogicFrameworkクライアントツールは、ServerSideLogicFramework開発元のみが開発、修正、保守、メンテナンス、配布する。
+
+Repository CMS開発元、開発元公認セカンドパーティーモジュール開発者、エンドユーザーは、ServerSideLogicFramework本体およびクライアントツールを独自に開発、改変、再実装、配布してはならない。
 
 ---
 
@@ -160,7 +194,9 @@ Repository CMSで採用する場合、すべてのHTTPアクセスは `Repositor
 
 # 8. 分離実装計画
 
-サーバーサイドロジックフレームワーク関係の実装コードは、ServerSideLogicFramework/ServerSideLogicFramework.php に集約する。
+サーバーサイドロジックフレームワーク本体の実装コードは、ServerSideLogicFramework/ServerSideLogicFramework.php に集約する。
+
+ServerSideLogicFrameworkクライアントツール正本は、ServerSideLogicFramework/ServerSideLogicFrameworkClient.php に集約する。
 
 Repository CMS本体側およびServerSideLogicFramework/直下の別PHPファイルには、サーバーサイドロジックフレームワーク関係の実装コード実体を残さない。
 
@@ -170,8 +206,9 @@ Repository CMS本体側およびServerSideLogicFramework/直下の別PHPファ�
 - Repository CMS本体に残す責務
 - フレームワーク化する責務
 - フレームワーク対象外とする責務
-- 単一エントリーポイント連携の前提
-- APIサーバーにしない前提
+- 内部API経由方式の前提
+- 外部公開APIサーバーにしない前提
+- クライアントツール正本コピー必須の前提
 - ページ要求およびフォームPOSTで扱う処理
 - データ保全、CMSロック、メンテナンスモードとの関係
 
@@ -223,7 +260,7 @@ Repository CMS本体のTypeScript/JavaScript製移行計画および凍結中の
 
 Repository CMS本体は、Server Side Logic Frameworkの仕様および機能に準拠して開発する。
 
-Repository CMS本体は、フレームワーク内部クラスを直接呼び出さず、Runtimeが保持するServerSideLogicFramework窓口を通じて安全制御を利用する。
+Repository CMS本体は、フレームワーク内部クラスを直接呼び出さず、Coreへ組み込まれたServerSideLogicFrameworkクライアントツールを通じて内部APIを利用する。
 
 ---
 
@@ -254,7 +291,8 @@ Server Side Logic Framework候補は以下とする。
 - データ保全
 - 作業データ保全
 - サーバーサイド最終判定
-- 単一エントリーポイント連携
+- 内部API経由方式
+- クライアントツール正本コピー
 
 今後のRepository CMS部分は以下とする。
 
@@ -278,8 +316,9 @@ Server Side Logic Frameworkは、安定版ができるまで以下を継続す�
 - フレームワーク候補責務の整理
 - CMS本体責務の整理
 - ドキュメント分離
-- 単一エントリーポイント連携方針の確認
-- APIサーバー非採用方針の確認
+- 内部API経由方式の確認
+- 外部公開APIサーバー非採用方針の確認
+- クライアントツール正本コピー一致確認
 - データ保全とCMSロックの整合性確認
 - アップデートとメンテナンスモードの整合性確認
 
@@ -292,8 +331,11 @@ Server Side Logic Frameworkは、安定版ができるまで以下を継続す�
 分離実装では、以下の単一ファイルをサーバーサイド安全制御フレームワークとする。
 
 - ServerSideLogicFramework/ServerSideLogicFramework.php
+- ServerSideLogicFramework/ServerSideLogicFrameworkClient.php
 
 ServerSideLogicFramework/ServerSideLogicFramework.php には、フレームワーク内部クラスをすべて集約する。
+
+ServerSideLogicFramework/ServerSideLogicFrameworkClient.php には、Repository CMSへコピーして組み込むクライアントツール正本を集約する。
 
 フレームワークは以下を担当する。
 
@@ -309,10 +351,10 @@ ServerSideLogicFramework/ServerSideLogicFramework.php には、フレームワ�
 - 作業データ保全
 - HTTPメソッド判定
 
-フレームワークはAPIサーバーではない。
+フレームワークは外部公開APIサーバーではない。
 
-フレームワークはRepositoryCMS/Core/App/Bootstrap.phpからオートロードされ、RepositoryCMS/Core/App/Runtime.phpで保持される。
+フレームワークは内部API実行環境を持ち、Repository CMSはCoreへ組み込まれたServerSideLogicFrameworkクライアントツール経由で利用する。
 
 Repository CMS本体は、フレームワーク仕様および機能に準拠して開発する。
 
-Repository CMS本体から利用する公開窓口は ServerSideLogicFramework クラスとし、内部クラスは単一ファイル内の実装詳細として扱う。
+Repository CMS本体から利用する窓口は ServerSideLogicFrameworkClient とし、ServerSideLogicFramework本体および内部クラスは直接呼び出さない。

@@ -4,6 +4,46 @@
 
 ---
 
+## v.0.15
+
+- UpdateValidatorのCore更新対象をCore直下、Lang、Themes構成へ変更。
+- Core/App前提のPHPファイル数検査をCore実行用PHP最大2ファイル検査へ更新。
+- Repository CMS最小Core構成でrelease-check-okを確認。
+
+---
+
+## v.0.14
+
+- Repository CMS側のClientコピー先をCore/App配下からCore直下へ変更。
+- 最小Core構成に合わせ、Framework連携構造をCore/app.phpからClient経由へ整理。
+- Framework本体とClient正本の単一ファイル原則は維持。
+
+---
+
+## v.0.13
+
+- release-checkへRepository CMS CoreからFramework内部クラスへの直接呼び出し禁止検査を追加。
+- Runtime::createからClient正本コピー経由でFrameworkを利用する統合状態を検証対象へ追加。
+- Client経由境界とGit未設定ロックの安定化検査でrelease-check-okを確認。
+
+---
+
+## v.0.12
+
+- ServerSideLogicFrameworkClient.phpを正本として追加し、Framework本体への内部API窓口を実装。
+- Repository CMS Coreコピーとの一致確認と未組み込み時動作不可を検査対象へ追加。
+- Framework本体はServerSideLogicFramework.php単一、ClientはClient単一の構成へ更新。
+
+---
+
+## v.0.11
+
+- Repository CMS連携を単一エントリーポイント経由方式から内部API経由方式へ変更。
+- ServerSideLogicFrameworkClient正本とCMS Core側コピー必須、改変時動作不可の仕様を明記。
+- Framework本体とクライアントツールの開発、保守、配布権限をFramework開発元に限定。
+
+---
+
 ## v.0.10
 
 - 利用者データ資産を所有しない共通思想をMaster_Specへ明記。

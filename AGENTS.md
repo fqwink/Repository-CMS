@@ -25,7 +25,10 @@
 - 当面は、ServerSideLogicFramework原型作成、強化、安定版作成、Repository CMS本体との責務分離、運用適合確認を最優先すること。
 - `ServerSideLogicFramework/` は同一リポジトリ内で恒久管理し、別リポジトリへ分割しないこと。
 - Repository CMS本体は、`ServerSideLogicFramework/` の仕様・機能に準拠して開発すること。
-- サーバーサイドロジックフレームワーク関係の実装コードは `ServerSideLogicFramework/ServerSideLogicFramework.php` の単一ファイル原則とし、Repository CMS本体側へ実体を残さないこと。
+- サーバーサイドロジックフレームワーク本体は `ServerSideLogicFramework/ServerSideLogicFramework.php` の単一ファイル原則とし、Repository CMS本体側へ実体を残さないこと。
+- ServerSideLogicFrameworkクライアントツール正本は `ServerSideLogicFramework/ServerSideLogicFrameworkClient.php` の単一ファイル原則とし、Repository CMSは正本コピーを `RepositoryCMS/Core/ServerSideLogicFrameworkClient.php` としてCoreへ組み込むこと。
+- Repository CMSはServerSideLogicFrameworkとの連携を内部API経由方式とし、ServerSideLogicFrameworkクライアントツールを組み込まない場合は動作不可とすること。
+- ServerSideLogicFramework本体およびクライアントツールは、ServerSideLogicFramework開発元のみが開発、保守、メンテナンス、配布できること。
 - サーバーサイドロジックフレームワーク関連ドキュメントは `ServerSideLogicFramework/Docs/` で管理し、Repository CMS本体関連ドキュメントは `RepositoryCMS/Docs/` で管理すること。
 - `RepositoryCMS/Docs/Master_Spec` の修正・変更・削除は、必ず事前にユーザーの承認を得てから行うこと。
 - `RepositoryCMS/Docs/Master_Design` の修正・変更・削除は、必ず事前にユーザーの承認を得てから行うこと。
@@ -57,7 +60,7 @@
 
 - 認証情報・トークン・秘密鍵・パスワードをGit管理対象にしないこと。
 - 外部依存を追加する場合は、必要性を明確にすること。
-- RepositoryCMS/Core・RepositoryCMS/Modules への直接アクセスを前提にした設計を行わないこと。
+- `RepositoryCMS/Core/app.php` 以外への直接アクセスを前提にした設計を行わないこと。
 
 ## 実装ルール
 
@@ -69,23 +72,26 @@
 ## 開発元アップデート
 
 - 承認済み構成方針では、リポジトリルート直下は `RepositoryCMS/` と `ServerSideLogicFramework/` の2系統を基本とすること。
-- Repository CMS本体は `RepositoryCMS/` で管理し、CMS本体カウント対象フォルダは `RepositoryCMS/Core/`、`RepositoryCMS/Modules/`、`RepositoryCMS/Work/` の最大3フォルダとすること。
+- Repository CMS本体は `RepositoryCMS/` で管理し、CMS本体カウント対象フォルダは `RepositoryCMS/Core/`、`RepositoryCMS/Work/` の最大2フォルダとすること。
 - `RepositoryCMS/Docs/` はCMS本体ドキュメント領域であり、CMS本体カウント対象外とすること。
 - `ServerSideLogicFramework/` はRepository CMS本体とは別責務の並行開発領域とし、同一リポジトリ内で開発コスト削減と開発効率化を優先して管理すること。
 - `ServerSideLogicFramework/` を別リポジトリへ分割する計画は廃止すること。
 - 現在のRepository CMSを活用し、サーバーサイドロジックフレームワーク部分と今後のCMS部分を段階的に分離して、フレームワーク安定版ができるまで進めること。
-- 承認済み構成方針では、`RepositoryCMS/Core/` 直下フォルダは最大7フォルダとし、現行方針は `RepositoryCMS/Core/App/`、`RepositoryCMS/Core/Config/` の2フォルダとすること。
-- 開発元のアップデート更新対象は `RepositoryCMS/Core/app.php`、`RepositoryCMS/Core/.htaccess`、`RepositoryCMS/Core/App/` のみとすること。
-- アップデートリリースのマニフェストパスはCMSルート相対とし、`Core/app.php`、`Core/.htaccess`、`Core/App/` を使うこと。
-- 開発元は `RepositoryCMS/Core/App/` 直下を更新、改良、バグ修正できること。
-- エンドユーザーへ `RepositoryCMS/Core/App/` 直下の変更、修正、カスタマイズ権限を与えないこと。
-- テーマ関連ソースコードは `RepositoryCMS/Core/App/Themes/` で開発元管理とし、アップデート時に上書きされる前提とすること。
+- 承認済み構成方針では、`RepositoryCMS/Core/` 直下フォルダは最大3フォルダとし、現行方針は `RepositoryCMS/Core/Config/`、`RepositoryCMS/Core/Lang/`、`RepositoryCMS/Core/Themes/` の3フォルダとすること。
+- 開発元のアップデート更新対象は `RepositoryCMS/Core/app.php`、`RepositoryCMS/Core/.htaccess`、`RepositoryCMS/Core/ServerSideLogicFrameworkClient.php`、`RepositoryCMS/Core/Lang/`、`RepositoryCMS/Core/Themes/` のみとすること。
+- アップデートリリースのマニフェストパスはCMSルート相対とし、`Core/app.php`、`Core/.htaccess`、`Core/ServerSideLogicFrameworkClient.php`、`Core/Lang/`、`Core/Themes/` を使うこと。
+- 開発元は `RepositoryCMS/Core/app.php`、`RepositoryCMS/Core/.htaccess`、`RepositoryCMS/Core/ServerSideLogicFrameworkClient.php`、`RepositoryCMS/Core/Lang/`、`RepositoryCMS/Core/Themes/` を更新、改良、バグ修正できること。
+- エンドユーザーへ `RepositoryCMS/Core/app.php`、`RepositoryCMS/Core/ServerSideLogicFrameworkClient.php`、`RepositoryCMS/Core/Lang/`、`RepositoryCMS/Core/Themes/` の変更、修正、カスタマイズ権限を与えないこと。
+- テーマ関連ソースコードは `RepositoryCMS/Core/Themes/` で開発元管理とし、アップデート時に上書きされる前提とすること。
 - ユーザーによるテーマ関連ソースコードの修正・カスタマイズを前提にしないこと。
-- 多言語化データは `RepositoryCMS/Core/App/Lang/` で開発元管理とし、アップデート時に上書きされる前提とすること。
+- 多言語化データは `RepositoryCMS/Core/Lang/` で開発元管理とし、アップデート時に上書きされる前提とすること。
 - `RepositoryCMS/Core/Config/` は保護設定領域とし、アップデート時に上書き、削除、初期化しないこと。
 - `RepositoryCMS/Core/Config/` 直下にサブフォルダを作成しないこと。
 - `RepositoryCMS/Core/Config/` には認証情報、ログイン失敗状態、CMSロック状態、CMS状態、ユーザーテーマ設定を直下ファイルとして保存すること。
-- 開発元は `RepositoryCMS/Core/Config/`、`RepositoryCMS/Modules/`、`RepositoryCMS/Work/`、`RepositoryCMS/Docs/`、コンテンツデータ、公開成果物、運用履歴に関与しないこと。
+- 開発元は `RepositoryCMS/Core/Config/`、`RepositoryCMS/Core/App/`、`RepositoryCMS/Modules/`、`RepositoryCMS/Work/`、`RepositoryCMS/Docs/`、コンテンツデータ、公開成果物、運用履歴に関与しないこと。
+- `RepositoryCMS/Core/App/` は廃止方針とし、作成・維持しないこと。
+- 開発元公認セカンドパーティーモジュール計画は、優先事項の大幅な変更に伴い凍結とし、`RepositoryCMS/Modules/` を作成・維持しないこと。
+- 開発元公認セカンドパーティーモジュール計画は廃止ではなく凍結であり、将来的に復帰する場合は、先にマスター仕様へ復帰方針、責務境界、配置、権限、アップデート対象可否を明記し、承認後に設計・実装すること。
 - `RepositoryCMS/Core/Data/` は廃止方針とし、作成・維持しないこと。
 - 作業データを `RepositoryCMS/Core/` 直下に作成・維持しないこと。
 - 作業データは `RepositoryCMS/Work/` のみで扱い、開発元アップデート対象にしないこと。

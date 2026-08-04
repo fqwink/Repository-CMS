@@ -2,7 +2,7 @@
 
 # マスター仕様書
 
-**Version:** v\.0\.13
+**Version:** v\.0\.14
 
 ---
 
@@ -73,7 +73,7 @@ Repository CMSの責務は、利用者のデータ資産を安全に作成、編
 
 Repository CMSは、何を操作するかを担当する。
 
-Repository CMSは、認証、認可、CSRF、CMSロック、アップデート、作業データ保全などの安全制御を直接保持せず、ServerSideLogicFrameworkの公開窓口を通じて利用する。
+Repository CMSは、認証、認可、CSRF、CMSロック、アップデート、作業データ保全などの安全制御を直接保持せず、ServerSideLogicFrameworkクライアントツールを通じた内部API経由方式で利用する。
 
 ---
 
@@ -83,7 +83,7 @@ ServerSideLogicFrameworkは、Repository CMSが利用者データを扱う際の
 
 Repository CMSは、ServerSideLogicFrameworkに準拠して開発する。
 
-Repository CMSは、ServerSideLogicFramework内部クラスを直接呼び出さず、Runtimeが保持する公開窓口を通じて安全制御を利用する。
+Repository CMSは、ServerSideLogicFramework内部クラスを直接呼び出さず、ServerSideLogicFrameworkクライアントツールを通じた内部API経由方式で安全制御を利用する。
 
 ServerSideLogicFrameworkは、Repository CMSの操作に対してサーバーサイド最終判定を行う。
 
@@ -372,11 +372,10 @@ public\_html/ は採用しない。
   - Core/
     - app\.php
     - \.htaccess
-    - App/
-      - Lang/
-      - Themes/
+    - ServerSideLogicFrameworkClient\.php
     - Config/
-  - Modules/
+    - Lang/
+    - Themes/
   - Work/
   - Docs/
 - ServerSideLogicFramework/
@@ -385,12 +384,11 @@ public\_html/ は採用しない。
 
 Repository CMS本体は RepositoryCMS/ で管理する。
 
-RepositoryCMS/ 直下のRepository CMS本体カウント対象フォルダは最大3フォルダとする。
+RepositoryCMS/ 直下のRepository CMS本体カウント対象フォルダは最大2フォルダとする。
 
 カウント対象は以下とする。
 
 - Core/
-- Modules/
 - Work/
 
 RepositoryCMS/Docs/ はドキュメント領域であり、RepositoryCMS/ 直下フォルダ数のカウント対象外とする。
@@ -399,12 +397,13 @@ ServerSideLogicFramework/ はRepository CMS本体とは別責務の並行開発�
 
 RepositoryCMS/Work/ はRepositoryCMS本体カウント対象とする。
 
-RepositoryCMS/Core/ 直下フォルダは最大7フォルダとする。
+RepositoryCMS/Core/ 直下フォルダは最大3フォルダとする。
 
-現行方針では RepositoryCMS/Core/ 直下フォルダは以下の2フォルダとする。
+現行方針では RepositoryCMS/Core/ 直下フォルダは以下の3フォルダとする。
 
-- App/
 - Config/
+- Lang/
+- Themes/
 
 ---
 
@@ -428,28 +427,30 @@ Coreは以下で構成する。
 
 - app\.php
 - \.htaccess
-- App/
+- ServerSideLogicFrameworkClient\.php
 - Config/
+- Lang/
+- Themes/
 
-RepositoryCMS/Core/App/ はCMS本体コード領域とする。
+RepositoryCMS/Core/app\.php はCMS本体コード領域とする。
 
-RepositoryCMS/Core/App/ は開発元管理領域とする。
+RepositoryCMS/Core/app\.php はCMS本体コードの単一ファイル原則とする。
 
-開発元は RepositoryCMS/Core/App/ 直下を変更、修正、更新、改良、バグ修正できる。
+RepositoryCMS/Core/ServerSideLogicFrameworkClient\.php はServerSideLogicFrameworkクライアントツール正本コピー領域とする。
 
-エンドユーザーには RepositoryCMS/Core/App/ 直下の変更、修正、カスタマイズ権限を与えない。
+Repository CMSの実行に必要なPHPファイルは、RepositoryCMS/Core/app\.php と RepositoryCMS/Core/ServerSideLogicFrameworkClient\.php の最大2ファイルとする。
 
-RepositoryCMS/Core/App/ には以下を含める。
+RepositoryCMS/Core/\.htaccess はHTTPアクセス制御ファイルであり、CMS本体PHPファイル数には含めない。
 
-- CMS本体コード
-- 多言語化データ
-- テーマ関連ソースコード
+開発元は RepositoryCMS/Core/app\.php、RepositoryCMS/Core/\.htaccess、RepositoryCMS/Core/ServerSideLogicFrameworkClient\.php、RepositoryCMS/Core/Lang/、RepositoryCMS/Core/Themes/ を変更、修正、更新、改良、バグ修正できる。
 
-RepositoryCMS/Core/App/Lang/ はCMSサーバ等を多言語化するための開発元管理データ領域とする。
+エンドユーザーには RepositoryCMS/Core/app\.php、RepositoryCMS/Core/ServerSideLogicFrameworkClient\.php、RepositoryCMS/Core/Lang/、RepositoryCMS/Core/Themes/ の変更、修正、カスタマイズ権限を与えない。
 
-RepositoryCMS/Core/App/Lang/ はアップデート時に上書きされる前提とする。
+RepositoryCMS/Core/Lang/ はCMSサーバ等を多言語化するための開発元管理データ領域とする。
 
-RepositoryCMS/Core/App/Themes/ はテーマ関連ソースコード領域とする。
+RepositoryCMS/Core/Lang/ はアップデート時に上書きされる前提とする。
+
+RepositoryCMS/Core/Themes/ はテーマ関連ソースコード領域とする。
 
 テーマ関連ソースコードは開発元管理とし、アップデート時に上書きされる前提とする。
 
@@ -471,25 +472,31 @@ RepositoryCMS/Core/Config/ には以下を含める。
 
 RepositoryCMS/Core/Config/ はアップデート時に上書き、削除、初期化しない。
 
+RepositoryCMS/Core/App/ は廃止する。
+
+RepositoryCMS/Core/App/ を作成・維持してはならない。
+
 RepositoryCMS/Core/Data/ は廃止する。
 
 RepositoryCMS/Core/Data/ を作成・維持してはならない。
 
 RepositoryCMS/Core/ 直下に作業データ用フォルダを作成・維持してはならない。
 
-RepositoryCMS/Core/App/、RepositoryCMS/Core/Config/、RepositoryCMS/Modules/ への直接アクセスは禁止する。
+RepositoryCMS/Core/Config/、RepositoryCMS/Core/Lang/、RepositoryCMS/Core/Themes/ への直接アクセスは禁止する。
 
-共通利用される機能はすべてRepositoryCMS/Core/App/へ集約する。
+共通利用されるCMS本体機能はすべてRepositoryCMS/Core/app\.phpへ集約する。
 
-CMS本体は最大23ファイル原則を採用する。
+CMS本体は最小ファイル原則を採用する。
 
-RepositoryCMS/Core/App/ のPHPファイル数は最大23ファイルまでとする。
+RepositoryCMS/Core/ の実行用PHPファイル数は最大2ファイルまでとする。
 
-23ファイルは上限であり、不要なファイル追加は行わない。
+2ファイルは上限であり、不要なファイル追加は行わない。
 
-責務分割が必要な場合のみファイルを追加する。
+CMS本体機能は原則としてRepositoryCMS/Core/app\.phpへ集約する。
 
-23ファイルを超える場合は、事前にマスター仕様変更案を提示し、承認を得る。
+2ファイルを超える場合は、事前にマスター仕様変更案を提示し、承認を得る。
+
+Core直下のリリース確認用スクリプトなど、開発・リリース確認専用ファイルは実行用PHPファイル数に含めない。
 
 ---
 
@@ -511,11 +518,14 @@ ServerSideLogicFramework/ のドキュメントは以下で管理する。
 - ServerSideLogicFramework/Docs/Master_Design
 - ServerSideLogicFramework/Docs/Change_History
 
-サーバーサイドロジックフレームワーク関係の実装コードは、単一ファイル原則として ServerSideLogicFramework/ServerSideLogicFramework.php に集約する。
+サーバーサイドロジックフレームワーク本体の実装コードは、単一ファイル原則として ServerSideLogicFramework/ServerSideLogicFramework.php に集約する。
+
+ServerSideLogicFrameworkクライアントツール正本は、単一ファイル原則として ServerSideLogicFramework/ServerSideLogicFrameworkClient.php に配置する。
 
 ServerSideLogicFramework/ 直下の構成は以下とする。
 
 - ServerSideLogicFramework.php
+- ServerSideLogicFrameworkClient.php
 - Docs/
 
 Repository CMS本体側およびServerSideLogicFramework/直下の別PHPファイルには、サーバーサイドロジックフレームワーク関係の実装コード実体を残さない。
@@ -526,23 +536,35 @@ Repository CMS本体に関する仕様、設計、変更履歴は RepositoryCMS/
 
 サーバーサイドロジックフレームワークに関する仕様、設計、変更履歴は ServerSideLogicFramework/Docs/ で管理する。
 
-Repository CMSは、サーバーサイドロジックフレームワークの仕様および機能に準拠して開発する。
+ServerSideLogicFramework本体およびServerSideLogicFrameworkクライアントツールは、ServerSideLogicFramework開発元のみが開発、修正、保守、メンテナンス、配布する。
 
-サーバーサイドロジックフレームワークを採用する場合、サーバーサイドロジックフレームワークはAPIサーバーとして扱わない。
+Repository CMS開発元、開発元公認セカンドパーティーモジュール開発者、エンドユーザーは、ServerSideLogicFramework本体およびServerSideLogicFrameworkクライアントツールを独自に開発、改変、再実装、配布してはならない。
 
-サーバーサイドロジックフレームワークはJSON API、REST API、内部API、fetch前提の処理を持たない。
+Repository CMSは、ServerSideLogicFramework開発元が配布する正本クライアントツールをコピーしてCoreへ組み込む場合のみ、ServerSideLogicFrameworkとの連携を許可する。
 
-サーバーサイドロジックフレームワークを採用する場合でも、すべてのHTTPアクセスは単一エントリーポイント RepositoryCMS/Core/app.php を経由する。
+ServerSideLogicFrameworkクライアントツールのCore組み込み先は、RepositoryCMS/Core/ServerSideLogicFrameworkClient.php に固定する。
 
-RepositoryCMS/Core/app.php は、サーバーサイドロジックフレームワークとTypeScript/JavaScript製CMSフロントサイドの連携システムとして位置付ける。
+Repository CMS側に組み込まれたServerSideLogicFrameworkクライアントツールが未配置、破損、改変、不一致、互換性不一致、出所不明、署名不一致、チェックサム不一致の場合、Repository CMSは起動および動作してはならない。
 
-分離実装では、RepositoryCMS/Core/App/Bootstrap.php が Repository CMS本体と ServerSideLogicFramework のオートロードを担当し、RepositoryCMS/Core/App/Runtime.php がサーバーサイドロジックフレームワークを保持する。
+Repository CMSは、ServerSideLogicFrameworkクライアントツールをCoreへ組み込まない場合、起動および動作してはならない。
 
-Repository CMS本体は、認証、認可、ログイン要求、CSRF、ロック、アップデート、メンテナンス解除待機判定、HTTPメソッド判定、作業データ保全をサーバーサイドロジックフレームワークへ委譲する。
+ServerSideLogicFrameworkは外部公開APIサーバーとして扱わない。
 
-Repository CMS本体は、サーバーサイドロジックフレームワーク内部クラスへ直接依存せず、RepositoryCMS/Core/App/Runtime.php が保持する serverSide 窓口を通じて安全制御を利用する。
+ServerSideLogicFrameworkはJSON外部API、REST外部API、fetch前提の外部公開APIを提供しない。
 
-RepositoryCMS/Core/App/Runtime.php は、認証、ロック、作業データ保全の実体を公開プロパティとしてCMS本体へ露出しない。
+ServerSideLogicFrameworkは、Repository CMSとの連携用に内部API実行環境を持つ。
+
+Repository CMSとServerSideLogicFrameworkのやり取りは、単一エントリーポイント経由方式を廃止し、ServerSideLogicFrameworkクライアントツール経由の内部API方式へ変更する。
+
+RepositoryCMS/Core/app.php はCMSのHTTP入口として残すが、ServerSideLogicFrameworkとの連携方式としての単一エントリーポイント経由方式は採用しない。
+
+分離実装では、RepositoryCMS/Core/app.php が Repository CMS本体とCMS側に組み込まれたServerSideLogicFrameworkクライアントツールの読み込みを担当する。
+
+Repository CMS本体は、認証、認可、ログイン要求、CSRF、ロック、アップデート、メンテナンス解除待機判定、HTTPメソッド判定、作業データ保全をクライアントツール経由でサーバーサイドロジックフレームワークへ委譲する。
+
+Repository CMS本体は、サーバーサイドロジックフレームワーク内部クラスへ直接依存せず、RepositoryCMS/Core/ServerSideLogicFrameworkClient.php としてCoreに組み込まれた正本コピーを通じて内部APIを利用する。
+
+RepositoryCMS/Core/app.php は、認証、ロック、作業データ保全の実体をCMS本体固有責務として保持しない。
 
 サーバーサイドロジックフレームワークに準拠する機能、仕様に基づいてRepository CMS本体を開発する。
 
@@ -570,18 +592,23 @@ TypeScript/JavaScript製移行計画および凍結中の開発計画案は、�
 
 # 19\. Modules
 
-開発元公認セカンドパーティー専用。
+開発元公認セカンドパーティーモジュール計画は凍結する。
 
-- RepositoryCMS/Core/app\.php経由のみ実行
-- Coreへの直接アクセス禁止
-- 未公認モジュール禁止
-- 共通機能を持たない
+凍結理由は、優先事項の大幅な変更により、ServerSideLogicFramework強化、Repository CMS本体の最小化、運用基盤安定化を優先するためである。
+
+RepositoryCMS/Modules/ を作成・維持してはならない。
+
+開発元公認セカンドパーティー機能は、現時点では実装対象外とする。
+
+開発元公認セカンドパーティーモジュール計画は廃止ではなく凍結とし、将来的に計画復帰する可能性を残す。
+
+計画復帰する場合は、先にマスター仕様へ復帰方針、責務境界、配置、権限、アップデート対象可否を明記し、承認後に設計・実装する。
 
 ---
 
 # 20\. アップデートシステム
 
-アップデートシステムはRepositoryCMS/Core/App/に組み込む。
+アップデートシステムは、RepositoryCMS/Core/app.php と ServerSideLogicFramework内部API経由方式に組み込む。
 
 アップデートは開発元が提供するCore更新領域の更新機能である。
 
@@ -597,24 +624,26 @@ CMSは開発元リポジトリからアップデートリリース情報を取�
 
 # 21\. アップデート対象
 
-開発元アップデート対象は、リポジトリ上では `RepositoryCMS/Core/app.php`、`RepositoryCMS/Core/.htaccess`、`RepositoryCMS/Core/App/` のみとする。
+開発元アップデート対象は、リポジトリ上では `RepositoryCMS/Core/app.php`、`RepositoryCMS/Core/.htaccess`、`RepositoryCMS/Core/ServerSideLogicFrameworkClient.php`、`RepositoryCMS/Core/Lang/`、`RepositoryCMS/Core/Themes/` のみとする。
 
-アップデートリリースのマニフェストパスはCMSルート相対とし、`Core/app.php`、`Core/.htaccess`、`Core/App/` を使う。
+アップデートリリースのマニフェストパスはCMSルート相対とし、`Core/app.php`、`Core/.htaccess`、`Core/ServerSideLogicFrameworkClient.php`、`Core/Lang/`、`Core/Themes/` を使う。
 
-開発元は `RepositoryCMS/Core/app.php`、`RepositoryCMS/Core/.htaccess`、`RepositoryCMS/Core/App/`、テーマ関連ソースコード、多言語化データを更新、改良、バグ修正する。
+開発元は `RepositoryCMS/Core/app.php`、`RepositoryCMS/Core/.htaccess`、`RepositoryCMS/Core/ServerSideLogicFrameworkClient.php`、テーマ関連ソースコード、多言語化データを更新、改良、バグ修正する。
 
 開発元は `RepositoryCMS/Core/Config/`、`RepositoryCMS/Modules/`、`RepositoryCMS/Work/`、`RepositoryCMS/Docs/`、コンテンツデータ、公開成果物、CMSサーバ運用履歴に関与しない。
 
-RepositoryCMS/Core/App/ 内の扱いは以下とする。
+RepositoryCMS/Core/ 内の開発元管理領域の扱いは以下とする。
 
-- RepositoryCMS/Core/App/Lang/ はアップデート時に上書き可能
-- RepositoryCMS/Core/App/Themes/ はアップデート時に上書き可能
+- RepositoryCMS/Core/Lang/ はアップデート時に上書き可能
+- RepositoryCMS/Core/Themes/ はアップデート時に上書き可能
+- RepositoryCMS/Core/ServerSideLogicFrameworkClient.php は正本コピーとしてアップデート時に上書き可能
 - ユーザーによるテーマ関連ソースコードの修正・カスタマイズは禁止
 - 作業データは配置禁止
 
 以下はアップデート対象外とする。
 
 - RepositoryCMS/Modules/
+- RepositoryCMS/Core/App/
 - RepositoryCMS/Core/Config/
 - RepositoryCMS/Core/Data/
 - RepositoryCMS/Work/
@@ -628,9 +657,9 @@ RepositoryCMS/Core/App/ 内の扱いは以下とする。
 - 公開成果物
 - CMSサーバ運用履歴
 
-アップデートは `Core/app.php`、`Core/.htaccess`、`Core/App/` の置換・追加・修正として行う。
+アップデートは `Core/app.php`、`Core/.htaccess`、`Core/ServerSideLogicFrameworkClient.php`、`Core/Lang/`、`Core/Themes/` の置換・追加・修正として行う。
 
-アップデートによって、`RepositoryCMS/Core/Config/`、`RepositoryCMS/Core/Data/`、`RepositoryCMS/Modules/`、`RepositoryCMS/Work/`、`RepositoryCMS/Docs/`、作業データ、認証情報、ログイン失敗状態、CMSロック状態、CMS状態、ユーザーテーマ設定、コンテンツデータ、公開成果物、運用履歴を変更してはならない。
+アップデートによって、`RepositoryCMS/Core/Config/`、`RepositoryCMS/Core/App/`、`RepositoryCMS/Core/Data/`、`RepositoryCMS/Modules/`、`RepositoryCMS/Work/`、`RepositoryCMS/Docs/`、作業データ、認証情報、ログイン失敗状態、CMSロック状態、CMS状態、ユーザーテーマ設定、コンテンツデータ、公開成果物、運用履歴を変更してはならない。
 
 ---
 
@@ -716,11 +745,13 @@ Coreアップデートは適用前に検証する。
 - 必須PHPバージョン
 - Coreファイル数
 - 禁止パスの有無
-- RepositoryCMS/Core/App/Lang/ が許可対象として扱われていること
-- RepositoryCMS/Core/App/Themes/ が許可対象として扱われていること
+- RepositoryCMS/Core/Lang/ が許可対象として扱われていること
+- RepositoryCMS/Core/Themes/ が許可対象として扱われていること
+- RepositoryCMS/Core/ServerSideLogicFrameworkClient.php が正本コピーとして扱われていること
 - RepositoryCMS/Core/Config/ が含まれていないこと
+- RepositoryCMS/Core/App/ が含まれていないこと
 - RepositoryCMS/Core/Data/ が含まれていないこと
-- RepositoryCMS/Core/ 直下または RepositoryCMS/Core/App/ に作業データが含まれていないこと
+- RepositoryCMS/Core/ 直下に作業データが含まれていないこと
 - RepositoryCMS/Core/Config/ 内の保護設定が上書き、削除、初期化対象になっていないこと
 - RepositoryCMS/Modules/ が含まれていないこと
 - RepositoryCMS/Work/ が含まれていないこと
@@ -766,17 +797,17 @@ Coreアップデートは適用前に検証する。
 
 # 30\. アーキテクチャ
 
-コンポーネント・モジュラー・アーキテクチャを採用する。
+最小Core・内部API連携アーキテクチャを採用する。
 
 RepositoryCMS/Core/app\.php
 
 ↓
 
-RepositoryCMS/Core/App
+RepositoryCMS/Core/ServerSideLogicFrameworkClient\.php
 
 ↓
 
-RepositoryCMS/Modules
+ServerSideLogicFramework/ServerSideLogicFramework\.php
 
 ---
 
@@ -970,7 +1001,7 @@ v\.0\.8ではアップデート適用、メンテナンスモード切り替え�
 
 アップデート開始時にメンテナンスモードへ切り替え、検証済みCore更新ファイルを適用する。
 
-アップデート適用は、リポジトリ上では `RepositoryCMS/Core/app.php`、`RepositoryCMS/Core/.htaccess`、`RepositoryCMS/Core/App/` のみへ書き込む。リリースマニフェストではCMSルート相対の `Core/app.php`、`Core/.htaccess`、`Core/App/` を使う。
+アップデート適用は、リポジトリ上では `RepositoryCMS/Core/app.php`、`RepositoryCMS/Core/.htaccess`、`RepositoryCMS/Core/ServerSideLogicFrameworkClient.php`、`RepositoryCMS/Core/Lang/`、`RepositoryCMS/Core/Themes/` のみへ書き込む。リリースマニフェストではCMSルート相対の `Core/app.php`、`Core/.htaccess`、`Core/ServerSideLogicFrameworkClient.php`、`Core/Lang/`、`Core/Themes/` を使う。
 
 ## v\.0\.10
 
@@ -1002,9 +1033,13 @@ v\.0\.12後の追加修正、運用確認、リリース前後の品質改善を
 
 ## v\.0\.14
 
-広告配信枠機能を実装する。
+安定版リリースを行う。
 
-広告枠を `.json` で管理し、テーマ内の指定位置へ差し込む。
+新機能追加は行わず、既存実装範囲の不具合修正、検証強化、リリース品質向上を対象とする。
+
+管理画面のログイン画面とダッシュボード描画をrelease-checkで検証する。
+
+広告配信枠機能はv\.0\.14では実装しない。
 
 ## v\.0\.15
 

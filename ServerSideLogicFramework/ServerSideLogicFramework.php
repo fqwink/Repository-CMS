@@ -154,6 +154,11 @@ final class ServerSideLogicFramework
         $this->locks->lock($reason);
     }
 
+    public function clearLockIfReason(string $reason): void
+    {
+        $this->locks->clearIfReason($reason);
+    }
+
     public function lockState(): array
     {
         return $this->locks->state();
@@ -999,7 +1004,7 @@ final class UpdateValidator
 
     private function validateFiles(array $files, array &$checks): void
     {
-        $phpTargets = $this->currentCoreAppPhpFiles();
+        $phpTargets = $this->currentCorePhpFiles();
         foreach ($files as $index => $file) {
             if (!is_array($file)) {
                 $this->addCheck($checks, '更新ファイル #' . ($index + 1), false, 'ファイル定義が不正です。');
@@ -1013,7 +1018,7 @@ final class UpdateValidator
             $this->addCheck($checks, '取得元 ' . $path, Security::validRepositoryPath($source), $source === '' ? '取得元が空です。' : $source);
             $this->addCheck($checks, 'チェックサム形式 ' . $path, preg_match('/^[a-f0-9]{64}$/', $checksum) === 1, $checksum === '' ? 'チェックサムが空です。' : $checksum);
 
-            if ($this->allowedCoreUpdatePath($path) && str_starts_with($path, 'Core/App/') && str_ends_with($path, '.php') && substr_count($path, '/') === 2) {
+            if ($this->allowedCoreUpdatePath($path) && in_array($path, ['Core/app.php', 'Core/ServerSideLogicFrameworkClient.php'], true)) {
                 $phpTargets[$path] = true;
             }
 
@@ -1028,7 +1033,7 @@ final class UpdateValidator
                 $this->addCheck($checks, 'ファイル取得 ' . $path, false, $error->getMessage());
             }
         }
-        $this->addCheck($checks, 'Core/App PHPファイル数', count($phpTargets) <= 23, count($phpTargets) . ' files');
+        $this->addCheck($checks, 'Core実行用PHPファイル数', count($phpTargets) <= 2, count($phpTargets) . ' files');
     }
 
     private function allowedCoreUpdatePath(string $path): bool
@@ -1036,13 +1041,13 @@ final class UpdateValidator
         if (!Security::validRepositoryPath($path)) {
             return false;
         }
-        if ($path === 'Core/app.php' || $path === 'Core/.htaccess') {
+        if (in_array($path, ['Core/app.php', 'Core/.htaccess', 'Core/ServerSideLogicFrameworkClient.php'], true)) {
             return true;
         }
-        if (!str_starts_with($path, 'Core/App/')) {
+        if (!str_starts_with($path, 'Core/Lang/') && !str_starts_with($path, 'Core/Themes/')) {
             return false;
         }
-        if ($path === 'Core/App/' || str_ends_with($path, '/')) {
+        if ($path === 'Core/Lang/' || $path === 'Core/Themes/' || str_ends_with($path, '/')) {
             return false;
         }
         foreach (explode('/', $path) as $segment) {
@@ -1050,16 +1055,20 @@ final class UpdateValidator
                 return false;
             }
         }
-        return !str_starts_with($path, 'Core/App/../')
+        return !str_starts_with($path, 'Core/Lang/../')
+            && !str_starts_with($path, 'Core/Themes/../')
+            && !str_starts_with($path, 'Core/App/')
             && !str_starts_with($path, 'Core/Config/')
             && !str_starts_with($path, 'Core/Data/');
     }
 
-    private function currentCoreAppPhpFiles(): array
+    private function currentCorePhpFiles(): array
     {
         $files = [];
-        foreach (glob($this->runtime->appRoot . '/*.php') ?: [] as $file) {
-            $files['Core/App/' . basename($file)] = true;
+        foreach (['app.php', 'ServerSideLogicFrameworkClient.php'] as $file) {
+            if (is_file($this->runtime->coreRoot . '/' . $file)) {
+                $files['Core/' . $file] = true;
+            }
         }
         return $files;
     }
@@ -1116,21 +1125,21 @@ final class UpdateApplier
         }
 
         try {
-            $this->runtime->serverSide->lock('メンテナンスモード中です。');
+            $this->runtime->serverSideClient->lock('メンテナンスモード中です。');
             foreach (($release['files'] ?? []) as $file) {
                 $this->applyFile($file);
             }
-            $this->runtime->serverSide->cleanupWorkData();
-            $this->runtime->serverSide->lock($this->releaseWaitReason);
+            $this->runtime->serverSideClient->cleanupWorkData();
+            $this->runtime->serverSideClient->lock($this->releaseWaitReason);
             $report['checks'][] = ['name' => 'アップデート適用', 'ok' => true, 'message' => 'Core更新ファイルを適用しました。'];
             $report['passed']++;
             return $report;
         } catch (\Throwable $error) {
-            $this->runtime->serverSide->lock('アップデート適用に失敗しました: ' . $error->getMessage());
+            $this->runtime->serverSideClient->lock('アップデート適用に失敗しました: ' . $error->getMessage());
             try {
-                $this->runtime->serverSide->cleanupWorkData();
+                $this->runtime->serverSideClient->cleanupWorkData();
             } catch (\Throwable) {
-                $this->runtime->serverSide->lock('アップデート失敗後の作業データ削除に失敗しました。');
+                $this->runtime->serverSideClient->lock('アップデート失敗後の作業データ削除に失敗しました。');
             }
             throw $error;
         }
@@ -1145,8 +1154,8 @@ final class UpdateApplier
         if (!hash_equals($checksum, hash('sha256', $bytes))) {
             throw new \RuntimeException('アップデートファイルのチェックサムが一致しません: ' . $path);
         }
-        $workPath = $this->runtime->serverSide->writeWorkData(basename($path), $bytes);
-        if (!$this->runtime->serverSide->verifyWorkData($workPath, $checksum)) {
+        $workPath = $this->runtime->serverSideClient->writeWorkData(basename($path), $bytes);
+        if (!$this->runtime->serverSideClient->verifyWorkData($workPath, $checksum)) {
             throw new \RuntimeException('アップデート作業データの保全確認に失敗しました: ' . $path);
         }
         $target = $this->runtime->coreRoot . '/' . preg_replace('/^Core\//', '', $path);

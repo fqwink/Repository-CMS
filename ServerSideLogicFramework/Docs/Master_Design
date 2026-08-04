@@ -8,7 +8,9 @@
 
 # 1. 設計目的
 
-本設計書は、Repository CMSリポジトリ内で並行開発するServer Side Logic Frameworkの初期設計を定義する。
+本設計書は、Repository CMSリポジトリ内で並行開発するServer Side Logic Frameworkの設計を定義する。
+
+Server Side Logic Frameworkは、Repository CMSとは別責務の安全制御基盤であり、Repository CMSは本フレームワーク仕様に準拠して開発する。
 
 ---
 
@@ -21,45 +23,88 @@ ServerSideLogicFramework/
     Master_Design
     Change_History
   ServerSideLogicFramework.php
+  ServerSideLogicFrameworkClient.php
 ```
 
-`ServerSideLogicFramework/` 直下の実装コードは、`ServerSideLogicFramework.php` の単一ファイル原則とする。
+`ServerSideLogicFramework/ServerSideLogicFramework.php` は、フレームワーク本体の単一ファイル正本とする。
 
-Repository CMS本体側およびServerSideLogicFramework/直下の別PHPファイルには、サーバーサイドロジックフレームワーク関係の実装コード実体を残さない。
+`ServerSideLogicFramework/ServerSideLogicFrameworkClient.php` は、Repository CMSのCoreへコピーして組み込むクライアントツール正本とする。
 
-別リポジトリ分割計画は廃止し、同一リポジトリ内で開発コスト削減と開発効率化を優先して管理する。
+フレームワーク本体およびクライアントツールは、それぞれ単一ファイル原則とする。
 
-Server Side Logic Framework関連ドキュメントは本フォルダで管理し、Repository CMS本体関連ドキュメントはRepository CMS本体側の `RepositoryCMS/Docs/` で管理する。
+Repository CMS本体側には、フレームワーク本体の実装コード実体を残さない。
 
 ---
 
-# 3. 連携構造
+# 3. 開発元権限
+
+ServerSideLogicFramework本体およびServerSideLogicFrameworkクライアントツールは、ServerSideLogicFramework開発元のみが開発、修正、保守、メンテナンス、配布する。
+
+Repository CMS開発元、開発元公認セカンドパーティーモジュール開発者、エンドユーザーは、ServerSideLogicFramework本体およびクライアントツールを独自に開発、改変、再実装、配布しない。
+
+Repository CMSは、ServerSideLogicFramework開発元が配布する正本クライアントツールをコピーしてCoreへ組み込む場合のみ、ServerSideLogicFrameworkとの連携を許可する。
+
+---
+
+# 4. 内部API方式
+
+Server Side Logic Frameworkは、Repository CMSとの連携用に内部API実行環境を持つ。
+
+Repository CMSとServerSideLogicFrameworkの連携は、単一エントリーポイント経由方式を廃止し、ServerSideLogicFrameworkクライアントツール経由の内部API方式とする。
+
+Server Side Logic Frameworkは外部公開APIサーバーにしない。
+
+JSON外部API、REST外部API、fetch前提の外部公開APIは設計対象外とする。
+
+内部APIは、ServerSideLogicFrameworkクライアントツールからのみ利用する非公開連携方式とする。
+
+---
+
+# 5. クライアントツールCore組み込み
+
+クライアントツールの正本とCMS側コピーは以下とする。
+
+```text
+正本:
+ServerSideLogicFramework/ServerSideLogicFrameworkClient.php
+
+CMS側コピー:
+RepositoryCMS/Core/ServerSideLogicFrameworkClient.php
+```
+
+CMS側コピーは、必ず正本をコピーしてCoreへ組み込む。
+
+Repository CMSは、`RepositoryCMS/Core/ServerSideLogicFrameworkClient.php` が存在しない場合、起動および動作しない。
+
+CMS側コピーの独自作成、独自改変、部分改変、再実装は禁止する。
+
+CMS側コピーが未配置、破損、改変、不一致、互換性不一致、出所不明、署名不一致、チェックサム不一致の場合、Repository CMSは起動および動作しない。
+
+Repository CMSからServerSideLogicFrameworkへのアクセスは、Coreへ組み込まれたServerSideLogicFrameworkクライアントツール経由のみとする。
+
+Repository CMSは、ServerSideLogicFramework本体および内部クラスを直接呼び出さない。
+
+---
+
+# 6. 連携構造
 
 Repository CMSで採用する場合の連携構造は以下とする。
 
 ```text
 RepositoryCMS/Core/app.php
   ↓
-ServerSideLogicFramework
-  ↓
-RepositoryCMS/Core/App/
+RepositoryCMS/Core/ServerSideLogicFrameworkClient.php
+  ↓ internal API
+ServerSideLogicFramework/ServerSideLogicFramework.php
 ```
 
-`RepositoryCMS/Core/app.php` は単一エントリーポイントであり、フレームワークとTypeScript/JavaScript製CMSフロントサイドの連携システムを担当する。
+`RepositoryCMS/Core/app.php` はCMSのHTTP入口として残すが、フレームワークとの連携方式としての単一エントリーポイント経由方式は採用しない。
 
 ---
 
-# 4. API非採用
+# 7. 責務
 
-Server Side Logic FrameworkはAPIサーバーにしない。
-
-JSON API、REST API、内部API、fetch前提の処理は設計対象外とする。
-
----
-
-# 5. 責務
-
-Server Side Logic Frameworkは、ページ要求およびフォームPOSTの範囲で以下を扱う。
+Server Side Logic Framework本体は、内部API実行環境で以下を扱う。
 
 - 認証
 - 認可
@@ -68,68 +113,25 @@ Server Side Logic Frameworkは、ページ要求およびフォームPOSTの範�
 - CSRF
 - アップデート
 - メンテナンスモード
-- サーバーサイド最終判定
-
-CMS本体機能、UI、静的生成、Gitプロバイダー連携、テーマ管理、広告配信枠管理、多言語UIはRepository CMS本体側のTypeScript/JavaScript領域で扱う。
-
----
-
-# 6. 開発優先順位
-
-当面の開発優先順位は以下とする。
-
-1. 現在までのRepository CMS実装を活用した分離実装
-2. サーバーサイド安全制御の責務整理
-3. Repository CMS本体との責務分離
-4. Server Side Logic Framework強化
-5. Server Side Logic Framework安定版作成
-6. Repository CMS本体への運用適合確認
-7. 凍結中の開発計画案再開可否の別途判断
-
-安定版完成は、凍結中のRepository CMS開発計画案の再開条件ではない。
-
-安定版完成後も、Repository CMS本体へ適用し、単一エントリーポイント連携、API非採用、認証、認可、一時ロック、セッション、CSRF、アップデート、メンテナンスモード、CMSロック、データ保全の整合性を確認する。
-
----
-
-# 7. 分離実装設計
-
-`ServerSideLogicFramework/ServerSideLogicFramework.php` にフレームワーク実装コードを集約済みとする。
-
-設計作業は `ServerSideLogicFramework/Docs/` 内で進める。
-
-分離実装設計では、現在までのRepository CMS実装を分析対象とし、フレームワーク化する責務とCMS本体へ残す責務を分離する。
-
----
-
-# 8. 分析対象
-
-分離実装で分析する既存CMS側の主な対象は以下とする。
-
-- 単一エントリーポイント制御
-- 認証
-- 認可
-- 一時ロック
-- セッション
-- CSRF
-- アップデート制御
-- メンテナンスモード
 - CMSロック
-- 入力検証
+- データ保全
 - 作業データ保全
 - サーバーサイド最終判定
 
-分析対象は、フレームワーク分離素材として扱う。
+ServerSideLogicFrameworkクライアントツールは、Repository CMSから内部API実行環境へ接続するための唯一の連携窓口とする。
+
+CMS本体機能、UI、静的生成、Gitプロバイダー連携、テーマ管理、広告配信枠管理、多言語UIはRepository CMS本体側で扱う。
 
 ---
 
-# 9. 責務分類
-
-分離実装設計では、既存CMS実装を以下に分類する。
+# 8. 責務分類
 
 ```text
 Framework
-  Server Side Logic Framework実装責務
+  Server Side Logic Framework本体実装責務
+
+Framework Client
+  Repository CMSへコピーして組み込むクライアントツール責務
 
 CMS Core
   Repository CMS本体に残す責務
@@ -138,28 +140,33 @@ Out of Scope
   フレームワーク対象外
 ```
 
-Frameworkには、ページ要求およびフォームPOSTで扱うサーバーサイド安全制御を分類する。
+Frameworkには、内部API実行環境で扱うサーバーサイド安全制御を分類する。
+
+Framework Clientには、CMSから内部APIへ接続するための正本コピー型クライアントツールを分類する。
 
 CMS Coreには、CMS固有の画面、コンテンツ管理、静的生成、Gitプロバイダー連携、テーマ管理、公開制御を分類する。
 
-Out of Scopeには、APIサーバー化、JSON API、REST API、fetch前提処理を分類する。
+Out of Scopeには、外部APIサーバー化、JSON外部API、REST外部API、fetch前提処理を分類する。
 
 ---
 
-# 10. 分離実装後の成果物
+# 9. 安定版までの設計工程
 
-分離実装後の主な成果物は以下とする。
+1. 内部API方式の仕様を確定する
+2. ServerSideLogicFrameworkクライアントツール正本を設計する
+3. CMS側クライアントツール組み込み方式を設計する
+4. 正本コピー一致確認と改変検出を設計する
+5. Framework、Framework Client、CMS Coreを分類する
+6. Repository CMS本体仕様との重複を取り除く
+7. 外部公開API非採用を維持する
+8. データ保全、CMSロック、アップデート、メンテナンスモードの整合性を確認する
+9. 安定版として扱える水準を確認する
 
-- `ServerSideLogicFramework/ServerSideLogicFramework.php`
-- `ServerSideLogicFramework/Docs/Master_Spec`
-- `ServerSideLogicFramework/Docs/Master_Design`
-- `ServerSideLogicFramework/Docs/Change_History`
-
-フレームワーク実装コードは `ServerSideLogicFramework/ServerSideLogicFramework.php` 以外へ分散させない。
+安定版水準に到達するまで、分離設計とドキュメント分離を継続する。
 
 ---
 
-# 11. 次段階判断
+# 10. 次段階判断
 
 次段階へ進む場合は、仕様と設計を確定し、実装承認を必須とする。
 
@@ -167,77 +174,9 @@ Out of Scopeには、APIサーバー化、JSON API、REST API、fetch前提処�
 
 - 変更対象
 - 責務境界
-- RepositoryCMS/Core/app.phpとの連携前提
+- 内部API経由方式
+- クライアントツール正本コピー必須
+- クライアントツール改変時の起動不可
 - 既存CMSへの影響
-- APIサーバー非採用の維持
-- Repository CMS本体側にフレームワーク関係コード実体が残っていないこと
-
----
-
-# 12. 現在CMSからの分離設計
-
-現在のRepository CMS実装は、以下の2領域へ段階的に分離する。
-
-```text
-Framework
-  Server Side Logic Framework実装責務
-
-CMS Part
-  今後のRepository CMS本体
-```
-
-Frameworkには、認証、認可、一時ロック、セッション、CSRF、アップデート、メンテナンスモード、CMSロック、データ保全、作業データ保全、サーバーサイド最終判定、単一エントリーポイント連携を分類する。
-
-CMS Partには、管理画面、コンテンツ管理、静的生成、Gitプロバイダー連携、テーマ管理、公開制御、生成レポート、CMS固有UI、CMS固有画面遷移を分類する。
-
----
-
-# 13. 安定版までの設計工程
-
-Server Side Logic Framework安定版までの設計工程は以下とする。
-
-1. 既存CMS実装を分析する
-2. FrameworkとCMS Partを分類する
-3. Server Side Logic Framework仕様へ反映する
-4. Repository CMS本体仕様との重複を取り除く
-5. 単一エントリーポイント連携を確認する
-6. APIサーバー非採用を維持する
-7. データ保全、CMSロック、アップデート、メンテナンスモードの整合性を確認する
-8. 安定版として扱える水準を確認する
-
-安定版水準に到達するまで、分離設計とドキュメント分離を継続する。
-
----
-
-# 14. 分離実装設計
-
-分離実装では、以下の単一ファイルをServer Side Logic Frameworkとする。
-
-```text
-ServerSideLogicFramework/
-  ServerSideLogicFramework.php
-```
-
-Repository CMSとの連携は以下とする。
-
-```text
-RepositoryCMS/Core/App/Bootstrap.php
-  ↓ autoload
-RepositoryCms\Core / ServerSideLogicFramework/ServerSideLogicFramework.php
-
-RepositoryCMS/Core/App/Runtime.php
-  ↓ holds
-ServerSideLogicFramework\ServerSideLogicFramework
-
-RepositoryCMS/Core/App/App.php
-  ↓ delegates
-boot / requireLogin / authorize / requestMethod / csrf / update / work data
-```
-
-フレームワークは、認証、認可、ログイン要求、CSRF、CMSロック、アップデート、作業データ保全、メンテナンス解除待機判定、HTTPメソッド判定を担当する。
-
-Repository CMS本体は、ServerSideLogicFrameworkクラスの公開メソッドを通じて安全制御を利用する。
-
-Auth、LockManager、Security、UpdateValidator、UpdateApplier、WorkDataは単一ファイル内の内部実装詳細として扱い、CMS本体から直接呼び出さない。
-
-フレームワークはAPIサーバーとして動作しない。
+- 外部公開APIサーバー非採用の維持
+- Repository CMS本体側にフレームワーク本体関係コード実体が残っていないこと
