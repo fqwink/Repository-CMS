@@ -2,7 +2,7 @@
 
 # マスター設計書
 
-**Version:** v.0.17
+**Version:** v.0.19
 
 ---
 
@@ -135,11 +135,18 @@ Server Side Logic Framework本体は、内部API実行環境で以下を扱う�
 - CMSロック
 - データ保全
 - 作業データ保全
+- コンテンツ検証
 - サーバーサイド最終判定
 
 ServerSideLogicFrameworkクライアントツールは、Repository CMSから内部API実行環境へ接続するための唯一の連携窓口とする。
 
 CMS本体機能、UI、静的生成、Gitプロバイダー連携、テーマ管理、広告配信枠管理、多言語UIはRepository CMS本体側で扱う。
+
+`.png` と `.svg` の素材コンテンツ検証はFrameworkのサーバーサイド最終判定に含める。
+
+SVGは `<svg>` 要素を必須とし、スクリプト要素、イベント属性、`javascript:`、外部参照、`foreignObject`、`iframe`、`object`、`embed`、DOCTYPE、ENTITYを拒否する。
+
+素材管理UIそのものはRepository CMS本体側の責務とし、Frameworkは安全に扱える内容かどうかのみを判定する。
 
 ---
 

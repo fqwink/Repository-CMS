@@ -54,7 +54,7 @@ final class Bootstrap
 
 final class Config
 {
-    public const VERSION = 'v.0.17';
+    public const VERSION = 'v.0.19';
 
     public function __construct(
         public readonly string $provider,
@@ -1272,7 +1272,7 @@ final class Response
             $admin = $runtime->serverSideClient->role() === 'admin';
             $nav = '<nav><a href="?">' . self::escape($translator->t('nav.dashboard')) . '</a><a href="?action=new">' . self::escape($translator->t('nav.create')) . '</a><a href="?action=generate">' . self::escape($translator->t('nav.generate')) . '</a>';
             if ($admin) {
-                $nav .= '<a href="?action=publish">' . self::escape($translator->t('nav.publish')) . '</a><a href="?action=site_settings">' . self::escape($translator->t('nav.site_settings')) . '</a><a href="?action=ad_slots">' . self::escape($translator->t('nav.ad_slots')) . '</a><a href="?action=navigation">' . self::escape($translator->t('nav.navigation')) . '</a><a href="?action=pages">' . self::escape($translator->t('nav.pages')) . '</a><a href="?action=theme_display">' . self::escape($translator->t('nav.theme_display')) . '</a><a href="?action=themes">' . self::escape($translator->t('nav.themes')) . '</a><a href="?action=updates">' . self::escape($translator->t('nav.updates')) . '</a><a href="?action=users">' . self::escape($translator->t('nav.users')) . '</a>';
+                $nav .= '<a href="?action=publish">' . self::escape($translator->t('nav.publish')) . '</a><a href="?action=assets">' . self::escape($translator->t('nav.assets')) . '</a><a href="?action=site_settings">' . self::escape($translator->t('nav.site_settings')) . '</a><a href="?action=ad_slots">' . self::escape($translator->t('nav.ad_slots')) . '</a><a href="?action=navigation">' . self::escape($translator->t('nav.navigation')) . '</a><a href="?action=pages">' . self::escape($translator->t('nav.pages')) . '</a><a href="?action=theme_display">' . self::escape($translator->t('nav.theme_display')) . '</a><a href="?action=themes">' . self::escape($translator->t('nav.themes')) . '</a><a href="?action=updates">' . self::escape($translator->t('nav.updates')) . '</a><a href="?action=users">' . self::escape($translator->t('nav.users')) . '</a>';
             }
             $nav .= '<a href="?action=logout">' . self::escape($translator->t('nav.logout')) . '</a></nav>';
         }
@@ -1624,9 +1624,11 @@ final class StaticGenerator
             return;
         }
         if ($extension === 'svg') {
-            if (!preg_match('/<svg[\s>]/i', $bytes)) {
+            try {
+                $this->runtime->serverSideClient->validateContent($path, $bytes);
+            } catch (\Throwable $error) {
                 $this->runtime->serverSideClient->lock('SVG生成結果が不正です。');
-                throw new \RuntimeException('SVG生成結果が不正です。');
+                throw $error;
             }
             return;
         }
@@ -1680,6 +1682,7 @@ final class App
                 'restore' => $this->restore(),
                 'generate' => $this->generate(),
                 'publish' => $this->publish(),
+                'assets' => $this->assets(),
                 'site_settings' => $this->siteSettings(),
                 'site_settings_save' => $this->saveSiteSettings(),
                 'ad_slots' => $this->adSlots(),
@@ -1822,6 +1825,7 @@ final class App
             ['作成', '?action=new', '新しいコンテンツを作成します。', !$locked],
             ['静的生成', '?action=generate', 'コンテンツから公開成果物を生成します。', !$locked],
             ['公開', '?action=publish', '生成成果物を公開リポジトリへ保存します。', !$locked && $admin],
+            ['素材管理', '?action=assets', 'PNGとSVG素材の保全状態を確認します。', !$locked && $admin],
             ['サイト基本設定', '?action=site_settings', 'サイト名、公開URL、言語、メタ情報を管理します。', !$locked && $admin],
             ['広告配信枠', '?action=ad_slots', '広告枠ID、表示位置、表示状態、広告内容を管理します。', !$locked && $admin],
             ['ナビゲーション', '?action=navigation', 'メニュー項目、表示順、リンク先を管理します。', !$locked && $admin],
@@ -1853,6 +1857,45 @@ final class App
             $rows = '<tr><td colspan="3" class="muted">コンテンツはありません。またはGitプロバイダーが未設定です。</td></tr>';
         }
         return '<section class="panel"><div class="section-title"><h2>コンテンツ</h2><a class="button secondary" href="?action=new">作成</a></div><table class="list"><tr><th>パス</th><th>サイズ</th><th>操作</th></tr>' . $rows . '</table></section>';
+    }
+
+    private function assets(): void
+    {
+        $rows = '';
+        $total = 0;
+        foreach ($this->content->list() as $item) {
+            $path = (string) ($item['path'] ?? '');
+            if (!$this->isAssetPath($path)) {
+                continue;
+            }
+            $total++;
+            $size = (int) ($item['size'] ?? 0);
+            $checksum = '-';
+            try {
+                $bytes = $this->content->read($path);
+                $this->runtime->serverSideClient->validateContent($path, $bytes);
+                $size = strlen($bytes);
+                $checksum = substr($this->runtime->serverSideClient->checksum($bytes), 0, 16);
+            } catch (\Throwable $error) {
+                $checksum = '検証失敗: ' . $error->getMessage();
+            }
+            $rows .= '<tr><td><code>' . Response::escape($path) . '</code></td><td>' . $size . '</td><td><code>' . Response::escape($checksum) . '</code></td><td class="table-actions"><a href="?action=edit&path=' . rawurlencode($path) . '">編集</a><a href="?action=history&path=' . rawurlencode($path) . '">履歴</a></td></tr>';
+        }
+        if ($rows === '') {
+            $rows = '<tr><td colspan="4" class="muted">PNGまたはSVG素材はありません。またはGitプロバイダーが未設定です。</td></tr>';
+        }
+        $body = '<section class="page-head"><h2>素材管理</h2><p>PNGとSVG素材のパス、サイズ、チェックサムを確認します。保存は既存のコンテンツ保存処理を使用します。</p></section>'
+            . '<section class="summary-grid"><div><span>素材数</span><strong>' . $total . '</strong></div><div><span>対象拡張子</span><strong>.png / .svg</strong></div></section>'
+            . '<section class="panel"><div class="section-title"><h2>素材一覧</h2><a class="button secondary" href="?action=new">追加</a></div><table class="list"><tr><th>パス</th><th>サイズ</th><th>チェックサム</th><th>操作</th></tr>' . $rows . '</table></section>';
+        Response::html('素材管理', $body, $this->runtime);
+    }
+
+    private function isAssetPath(string $path): bool
+    {
+        if (!$this->runtime->serverSideClient->validContentPath($path)) {
+            return false;
+        }
+        return in_array($this->runtime->serverSideClient->allowedExtension($path), ['png', 'svg'], true);
     }
 
     private function edit(?string $path): void

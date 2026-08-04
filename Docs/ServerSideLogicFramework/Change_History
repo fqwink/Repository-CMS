@@ -4,6 +4,22 @@
 
 ---
 
+## v.0.19
+
+- SVG素材検証でスクリプト、イベント属性、外部参照、DOCTYPE、ENTITYを拒否する判定を追加。
+- Repository CMS v.0.19素材管理の保存時、静的生成時のサーバーサイド最終判定へ対応。
+- Framework本体正本とCMS Coreコピーの一致を維持し、release-checkで検証。
+
+---
+
+## v.0.18
+
+- Framework本体正本コピーをRepositoryCMS/Core/ServerSideLogicFramework.phpへ直接実行集約する実装へ追従。
+- release-checkでFramework本体コピーとClientコピーの正本一致、Core実行PHP最大3ファイル基準を確認。
+- Repository CMS v.0.18実装基準でCore直下連携とRuntime不要方針を確認。
+
+---
+
 ## v.0.17
 
 - Framework本体正本をCMS Coreへ直接実行集約し、RepositoryCMS/Core/ServerSideLogicFramework.phpへ正本コピーとして配置する設計へ変更。
@@ -23,7 +39,7 @@
 ## v.0.15
 
 - UpdateValidatorのCore更新対象をCore直下、Lang、Themes構成へ変更。
-- Core/App前提のPHPファイル数検査をCore実行用PHP最大2ファイル検査へ更新。
+- Core/App前提のPHPファイル数検査を当時のCore最小実行用PHP検査へ更新。
 - Repository CMS最小Core構成でrelease-check-okを確認。
 
 ---

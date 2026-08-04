@@ -285,6 +285,7 @@ final class ServerSideLogicFramework
             'preview',
             'generate',
             'publish',
+            'assets',
             'site_settings',
             'site_settings_save',
             'ad_slots',
@@ -934,8 +935,11 @@ final class Security
             if (!preg_match('/<svg[\s>]/i', $bytes)) {
                 throw new \InvalidArgumentException('SVGの形式が不正です。');
             }
-            if (preg_match('/<script[\s>]|on[a-z]+\s*=/i', $bytes)) {
+            if (preg_match('/<script[\s>]|on[a-z]+\s*=|javascript:|<foreignObject[\s>]|<iframe[\s>]|<object[\s>]|<embed[\s>]|<!ENTITY|<!DOCTYPE/i', $bytes)) {
                 throw new \InvalidArgumentException('SVGに許可されていないスクリプト要素があります。');
+            }
+            if (preg_match('/(?:href|xlink:href)\s*=\s*["\']\s*(?!#)[^"\']+/i', $bytes)) {
+                throw new \InvalidArgumentException('SVGに許可されていない外部参照があります。');
             }
         }
     }

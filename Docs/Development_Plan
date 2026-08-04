@@ -71,7 +71,7 @@
 - アップデート適用・メンテナンスモード制御を実装する。
 - アップデート開始時にメンテナンスモードへ切り替える。
 - 検証済みCore更新ファイルをCore更新領域へ適用する。
-- 更新対象は `Core/app.php`、`Core/.htaccess`、`Core/ServerSideLogicFrameworkClient.php`、`Core/Lang/`、`Core/Themes/` のみとする。
+- 更新対象は `Core/app.php`、`Core/.htaccess`、`Core/ServerSideLogicFramework.php`、`Core/ServerSideLogicFrameworkClient.php`、`Core/Lang/`、`Core/Themes/` のみとする。
 
 ## v.0.10
 
@@ -142,9 +142,11 @@
 
 ## v.0.20
 
-- 広告配信枠改良を行う。
-- v.0.16の広告配信枠基本機能を前提にする。
-- 表示制御、静的生成時の差し込みを強化する。
+- TypeScript/JavaScript製移行の初期段階とする。
+- `AdminFrontend/` を対象候補とし、管理画面補助処理をTypeScript正本で管理する方針を確定する。
+- リリース配布物にはTypeScriptソースを含めず、生成済みJavaScriptのみを `RepositoryCMS/Core/` へ実行集約する。
+- Node.js必須化、Deno必須化、外部ビルド環境必須化は行わない。
+- PHP側は `RepositoryCMS/Core/app.php` とServerSideLogicFramework連携を維持し、補助機能から段階移行する。
 
 ## v.0.21
 

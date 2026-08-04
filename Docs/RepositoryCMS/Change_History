@@ -4,6 +4,22 @@
 
 ---
 
+## v.0.40
+
+- 実装バージョンをv.0.19へ更新し、PNG/SVG素材管理画面、素材チェックサム表示、管理者専用導線を追加。
+- SVG危険要素検証を保存時と静的生成時へ強化し、release-checkへ素材描画とSVG拒否検査を追加。
+- Project Charter、Repository CMS設計、ServerSideLogicFramework設計をv.0.19素材管理方針へ更新。
+
+---
+
+## v.0.39
+
+- 実装バージョンをv.0.18へ更新し、CMS Core直接実行集約とFramework本体Coreコピー基準を実装。
+- release-checkをv.0.18、Core直下Framework本体コピー、Core実行PHP最大3ファイル基準へ更新。
+- Runtime不要、Core直下3フォルダ、CMS Core実行集約済みリリース方針の検証を確認。
+
+---
+
 ## v.0.38
 
 - CMS Coreを開発集約と実行集約の両方を持つ領域とし、Runtime不要、Core直下直接集約方針を追加。
@@ -111,7 +127,7 @@
 
 - CMS構成を最小化し、Core/AppとModulesを廃止方針へ変更。
 - CMS本体をCore/app.php、Framework ClientコピーをCore/ServerSideLogicFrameworkClient.phpへ整理。
-- RepositoryCMS本体の最小フォルダ原則と実行用PHP最大2ファイル原則を仕様・設計へ反映。
+- RepositoryCMS本体の最小フォルダ原則と当時の最小実行用PHP原則を仕様・設計へ反映。
 
 ---
 

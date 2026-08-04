@@ -211,9 +211,9 @@ else
   echo "git not found; skipped tracked config check."
 fi
 
-echo "== Future content features not exposed in v0.17 =="
+echo "== Future content features not exposed in v0.19 =="
 if grep -n -E 'blog_post|ブログ投稿' "$CMS_DIR/Core/app.php" AGENTS.md >/dev/null 2>&1; then
-    echo "future content feature code or UI is exposed in v0.17." >&2
+    echo "future content feature code or UI is exposed in v0.19." >&2
   grep -n -E 'blog_post|ブログ投稿' "$CMS_DIR/Core/app.php" AGENTS.md >&2
   exit 1
 fi
@@ -303,8 +303,17 @@ use ServerSideLogicFramework\WorkData;
 final class ReleaseCheckRenderGit implements GitProvider
 {
     public function configured(): bool { return true; }
-    public function listContent(): array { return []; }
-    public function readContent(string $path): string { return ''; }
+    public function listContent(): array { return [['path' => 'assets/logo.svg', 'size' => 46], ['path' => 'assets/pixel.png', 'size' => 68]]; }
+    public function readContent(string $path): string
+    {
+        if ($path === 'assets/logo.svg') {
+            return '<svg xmlns="http://www.w3.org/2000/svg"></svg>';
+        }
+        if ($path === 'assets/pixel.png') {
+            return base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==') ?: '';
+        }
+        return '';
+    }
     public function readContentAt(string $path, string $ref): string { return ''; }
     public function saveContent(string $path, string $bytes, string $message): void {}
     public function history(string $path): array { return []; }
@@ -339,7 +348,7 @@ $runtime = render_runtime(sys_get_temp_dir() . '/repository-cms-render-login-' .
 ob_start();
 (new App($runtime))->handle();
 $loginHtml = ob_get_clean();
-if (!is_string($loginHtml) || !str_contains($loginHtml, 'ログイン') || !str_contains($loginHtml, 'v.0.17')) {
+if (!is_string($loginHtml) || !str_contains($loginHtml, 'ログイン') || !str_contains($loginHtml, 'v.0.19')) {
     fwrite(STDERR, "login render failed\n");
     exit(1);
 }
@@ -354,8 +363,18 @@ $runtime->serverSideClient->login('owner', 'Password123456');
 ob_start();
 (new App($runtime))->handle();
 $dashboardHtml = ob_get_clean();
-if (!is_string($dashboardHtml) || !str_contains($dashboardHtml, 'ダッシュボード') || !str_contains($dashboardHtml, 'v.0.17') || !str_contains($dashboardHtml, '広告配信枠') || !str_contains($dashboardHtml, 'ナビゲーション') || !str_contains($dashboardHtml, '固定ページ') || !str_contains($dashboardHtml, 'テーマ表示設定')) {
+if (!is_string($dashboardHtml) || !str_contains($dashboardHtml, 'ダッシュボード') || !str_contains($dashboardHtml, 'v.0.19') || !str_contains($dashboardHtml, '素材管理') || !str_contains($dashboardHtml, '広告配信枠') || !str_contains($dashboardHtml, 'ナビゲーション') || !str_contains($dashboardHtml, '固定ページ') || !str_contains($dashboardHtml, 'テーマ表示設定')) {
     fwrite(STDERR, "dashboard render failed\n");
+    exit(1);
+}
+
+$_GET = ['action' => 'assets'];
+$_POST = [];
+ob_start();
+(new App($runtime))->handle();
+$assetsHtml = ob_get_clean();
+if (!is_string($assetsHtml) || !str_contains($assetsHtml, '素材管理') || !str_contains($assetsHtml, 'assets/logo.svg') || !str_contains($assetsHtml, 'チェックサム')) {
+    fwrite(STDERR, "assets render failed\n");
     exit(1);
 }
 
@@ -408,7 +427,7 @@ copy('RepositoryCMS/Core/Lang/en.json', $base . '/core/Lang/en.json');
 
 LanguageManager::assertLanguageFiles('RepositoryCMS/Core/Lang');
 $translator = new LanguageManager('RepositoryCMS/Core/Lang', 'en');
-if ($translator->t('nav.site_settings') !== 'Site Settings' || $translator->t('nav.ad_slots') !== 'Ad Slots' || $translator->t('nav.navigation') !== 'Navigation' || $translator->t('nav.pages') !== 'Pages' || $translator->t('nav.theme_display') !== 'Theme Display') {
+if ($translator->t('nav.site_settings') !== 'Site Settings' || $translator->t('nav.assets') !== 'Assets' || $translator->t('nav.ad_slots') !== 'Ad Slots' || $translator->t('nav.navigation') !== 'Navigation' || $translator->t('nav.pages') !== 'Pages' || $translator->t('nav.theme_display') !== 'Theme Display') {
     fwrite(STDERR, "language translation failed\n");
     exit(1);
 }
@@ -582,6 +601,50 @@ if (!$failed || !$locks->locked() || $entries !== ['.gitignore']) {
 echo "conservation-ok\n";
 PHP
 
+echo "== Asset validation =="
+"$PHP_BIN" <<'PHP'
+<?php
+define('REPOSITORY_CMS_NO_RUN', true);
+require 'RepositoryCMS/Core/app.php';
+
+use ServerSideLogicFramework\Auth;
+use ServerSideLogicFramework\LockManager;
+use ServerSideLogicFramework\ServerSideLogicFramework;
+use ServerSideLogicFramework\ServerSideLogicFrameworkClient;
+use ServerSideLogicFramework\WorkData;
+
+$base = sys_get_temp_dir() . '/repository-cms-asset-validation-' . bin2hex(random_bytes(4));
+mkdir($base . '/config', 0700, true);
+mkdir($base . '/work', 0700, true);
+file_put_contents($base . '/work/.gitignore', '');
+$locks = new LockManager($base . '/config/cms_lock.json');
+$auth = new Auth($base . '/config/auth.json', $base . '/config/login_state.json', $base . '/config/admin_initial_state.json');
+$client = new ServerSideLogicFrameworkClient(new ServerSideLogicFramework($auth, $locks, new WorkData($base . '/work', $locks)));
+$client->validateContent('assets/logo.svg', '<svg xmlns="http://www.w3.org/2000/svg"></svg>');
+$client->validateContent('assets/pixel.png', base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==') ?: '');
+
+$blocked = 0;
+foreach ([
+    '<svg><script>alert(1)</script></svg>',
+    '<svg onload="alert(1)"></svg>',
+    '<svg><image href="https://example.com/a.png"/></svg>',
+    '<svg><image href="assets/a.png"/></svg>',
+    '<!DOCTYPE svg><svg></svg>',
+] as $svg) {
+    try {
+        $client->validateContent('assets/bad.svg', $svg);
+    } catch (Throwable) {
+        $blocked++;
+    }
+}
+if ($blocked !== 5) {
+    fwrite(STDERR, "asset validation failed\n");
+    exit(1);
+}
+
+echo "asset-validation-ok\n";
+PHP
+
 echo "== Theme source tests =="
 "$PHP_BIN" <<'PHP'
 <?php
@@ -707,7 +770,7 @@ use ServerSideLogicFramework\WorkData;
 
 final class ReleaseCheckUpdateGit implements GitProvider
 {
-    public string $updateBytes = '<?php echo "v0.18";';
+    public string $updateBytes = '<?php echo "v0.20";';
     public bool $badBytes = false;
 
     public function configured(): bool { return true; }
@@ -722,7 +785,7 @@ final class ReleaseCheckUpdateGit implements GitProvider
     public function listUpdateReleases(): array
     {
         return [
-            ['version' => 'v.0.18', 'target_version' => 'v.0.17', 'released_at' => '2026-08-04T00:00:00Z', 'php' => '8.4', 'files' => [['path' => 'Core/app.php', 'source' => 'updates/v0.18/Core/app.php', 'checksum' => hash('sha256', $this->updateBytes)]]],
+            ['version' => 'v.0.20', 'target_version' => 'v.0.19', 'released_at' => '2026-08-04T00:00:00Z', 'php' => '8.4', 'files' => [['path' => 'Core/app.php', 'source' => 'updates/v0.20/Core/app.php', 'checksum' => hash('sha256', $this->updateBytes)]]],
             ['version' => 'v.0.13', 'target_version' => 'v.0.12', 'released_at' => '2026-08-04T00:00:00Z', 'php' => '8.4', 'files' => [['path' => 'Core/app.php', 'source' => 'updates/v0.13/Core/app.php', 'checksum' => str_repeat('a', 64)]]],
             ['version' => 'broken'],
         ];
