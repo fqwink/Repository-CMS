@@ -9,46 +9,55 @@
 
 ## ドキュメント関連ファイル一覧
 
-- `RepositoryCMS/Docs/Master_Spec`
-- `RepositoryCMS/Docs/Master_Design`
-- `RepositoryCMS/Docs/Brand_Color_Spec`
-- `RepositoryCMS/Docs/Change_History`
-- `ServerSideLogicFramework/Docs/Master_Spec`
-- `ServerSideLogicFramework/Docs/Master_Design`
-- `ServerSideLogicFramework/Docs/Change_History`
+- `Docs/Project_Charter`
+- `Docs/Development_Plan`
+- `Docs/Brand_Color_Spec`
+- `Docs/RepositoryCMS/Master_Design`
+- `Docs/RepositoryCMS/Change_History`
+- `Docs/ServerSideLogicFramework/Master_Design`
+- `Docs/ServerSideLogicFramework/Change_History`
 
 ## 基本方針
 
 - 既存の仕様・設計・ファイル構成を尊重すること。
 - ユーザーの明示指示がない限り、不要な仕様変更・大規模リファクタリング・削除を行わないこと。
-- TypeScript/JavaScript製移行計画および凍結中の開発計画案は、サーバーサイドロジックフレームワークの強化とRepository CMS本体への運用適合確認が完了するまで再開しないこと。
-- 当面は、ServerSideLogicFramework原型作成、強化、安定版作成、Repository CMS本体との責務分離、運用適合確認を最優先すること。
+- TypeScript/JavaScript製移行計画は、`Docs/Development_Plan` に基づき v.0.18 以降から段階的に進めること。
+- TypeScript/JavaScript製移行中も、ServerSideLogicFramework準拠、Repository CMS本体との責務分離、運用適合確認を維持すること。
 - `ServerSideLogicFramework/` は同一リポジトリ内で恒久管理し、別リポジトリへ分割しないこと。
 - Repository CMS本体は、`ServerSideLogicFramework/` の仕様・機能に準拠して開発すること。
 - サーバーサイドロジックフレームワーク本体は `ServerSideLogicFramework/ServerSideLogicFramework.php` の単一ファイル原則とし、Repository CMS本体側へ実体を残さないこと。
 - ServerSideLogicFrameworkクライアントツール正本は `ServerSideLogicFramework/ServerSideLogicFrameworkClient.php` の単一ファイル原則とし、Repository CMSは正本コピーを `RepositoryCMS/Core/ServerSideLogicFrameworkClient.php` としてCoreへ組み込むこと。
 - Repository CMSはServerSideLogicFrameworkとの連携を内部API経由方式とし、ServerSideLogicFrameworkクライアントツールを組み込まない場合は動作不可とすること。
 - ServerSideLogicFramework本体およびクライアントツールは、ServerSideLogicFramework開発元のみが開発、保守、メンテナンス、配布できること。
-- サーバーサイドロジックフレームワーク関連ドキュメントは `ServerSideLogicFramework/Docs/` で管理し、Repository CMS本体関連ドキュメントは `RepositoryCMS/Docs/` で管理すること。
-- `RepositoryCMS/Docs/Master_Spec` の修正・変更・削除は、必ず事前にユーザーの承認を得てから行うこと。
-- `RepositoryCMS/Docs/Master_Design` の修正・変更・削除は、必ず事前にユーザーの承認を得てから行うこと。
+- すべてのドキュメントは、リポジトリルート直下の `Docs/` で管理すること。
+- プロジェクト憲章およびマスター仕様は `Docs/Project_Charter` に集約すること。
+- 開発計画案は `Docs/Development_Plan` に一元管理し、バージョンごとの計画は5行以内で簡潔にまとめること。
+- ブランドカラー仕様は `Docs/Brand_Color_Spec` で管理すること。
+- Repository CMS本体関連ドキュメントは `Docs/RepositoryCMS/` で管理すること。
+- サーバーサイドロジックフレームワーク関連ドキュメントは `Docs/ServerSideLogicFramework/` で管理すること。
+- `Docs/Project_Charter` の修正・変更・削除は、必ず事前にユーザーの承認を得てから行うこと。
+- `Docs/Development_Plan` の修正・変更・削除は、必ず事前にユーザーの承認を得てから行うこと。
+- `Docs/RepositoryCMS/Master_Design` の修正・変更・削除は、必ず事前にユーザーの承認を得てから行うこと。
+- `Docs/ServerSideLogicFramework/Master_Design` の修正・変更・削除は、必ず事前にユーザーの承認を得てから行うこと。
 - 判断に迷う変更は、実装前にユーザーへ確認すること。
 
 ## 仕様・実装フロー
 
-- 仕様変更・機能追加・設計方針変更を行う場合は、まず `RepositoryCMS/Docs/Master_Spec` に記載する仕様方針を提案すること。
-- ユーザー承認を得るまで、`RepositoryCMS/Docs/Master_Spec` を更新・修正・削除しないこと。
-- ユーザー承認後に、承認された仕様方針を `RepositoryCMS/Docs/Master_Spec` へ明記すること。
-- `RepositoryCMS/Docs/Master_Spec` を確定してから、`RepositoryCMS/Docs/Master_Design` に記載する設計方針を提案すること。
-- ユーザー承認を得るまで、`RepositoryCMS/Docs/Master_Design` を更新・修正・削除しないこと。
-- ユーザー承認後に、承認された設計方針を `RepositoryCMS/Docs/Master_Design` へ明記すること。
-- 実装は、`RepositoryCMS/Docs/Master_Spec` と `RepositoryCMS/Docs/Master_Design` の確定後に行うこと。
-- `RepositoryCMS/Docs/Master_Design` 確定後、実装開始前に必ずユーザーから実装承認を得ること。
+- 仕様変更・機能追加・設計方針変更を行う場合は、まず `Docs/Project_Charter` に記載する仕様方針を提案すること。
+- 開発計画案を変更する場合は、まず `Docs/Development_Plan` に記載する計画方針を提案すること。
+- ユーザー承認を得るまで、`Docs/Project_Charter` と `Docs/Development_Plan` を更新・修正・削除しないこと。
+- ユーザー承認後に、承認された仕様方針を `Docs/Project_Charter` へ明記すること。
+- ユーザー承認後に、承認された開発計画方針を `Docs/Development_Plan` へ明記すること。
+- `Docs/Project_Charter` を確定してから、対象に応じた `Docs/RepositoryCMS/Master_Design` または `Docs/ServerSideLogicFramework/Master_Design` に記載する設計方針を提案すること。
+- ユーザー承認を得るまで、対象の `Master_Design` を更新・修正・削除しないこと。
+- ユーザー承認後に、承認された設計方針を対象の `Master_Design` へ明記すること。
+- 実装は、`Docs/Project_Charter`、`Docs/Development_Plan`、対象の `Master_Design` の確定後に行うこと。
+- 対象の `Master_Design` 確定後、実装開始前に必ずユーザーから実装承認を得ること。
 - 実装承認を得るまで、実装コードの追加・修正・削除を行わないこと。
-- 実装は、必ず `RepositoryCMS/Docs/Master_Spec` と `RepositoryCMS/Docs/Master_Design` に明記された内容通りに行うこと。
+- 実装は、必ず `Docs/Project_Charter`、`Docs/Development_Plan`、対象の `Master_Design` に明記された内容通りに行うこと。
 - 実装後は、確認可能な範囲でバグ修正を繰り返し、バグ修正ゼロ化を目指すこと。
-- 実装とバグ修正ゼロ化が完了してから、`RepositoryCMS/Docs/Change_History` を更新すること。
-- `RepositoryCMS/Docs/Change_History` には、バージョンごとの変更履歴を3行以内で簡潔に明記すること。
+- 実装とバグ修正ゼロ化が完了してから、対象の `Change_History` を更新すること。
+- `Change_History` には、バージョンごとの変更履歴を3行以内で簡潔に明記すること。
 
 ## データ保全
 
@@ -65,15 +74,15 @@
 ## 実装ルール
 
 - HTTPエントリーポイントは `RepositoryCMS/Core/app.php` を前提とすること。
-- 初期版では、マスター仕様書に記載された「将来機能」を実装しないこと。
-- 将来機能は、先に `RepositoryCMS/Docs/Master_Spec` へ仕様を明記し、ユーザー承認を得てから開発すること。
+- 初期版では、`Docs/Project_Charter` に記載された「将来機能」を実装しないこと。
+- 将来機能は、先に `Docs/Project_Charter` へ仕様を明記し、ユーザー承認を得てから開発すること。
 - 許可されたコンテンツ拡張子は `.md`, `.json`, `.png`, `.svg` のみとすること。
 
 ## 開発元アップデート
 
-- 承認済み構成方針では、リポジトリルート直下は `RepositoryCMS/` と `ServerSideLogicFramework/` の2系統を基本とすること。
+- 承認済み構成方針では、リポジトリルート直下は `Docs/`、`RepositoryCMS/`、`ServerSideLogicFramework/` の3系統を基本とすること。
 - Repository CMS本体は `RepositoryCMS/` で管理し、CMS本体カウント対象フォルダは `RepositoryCMS/Core/`、`RepositoryCMS/Work/` の最大2フォルダとすること。
-- `RepositoryCMS/Docs/` はCMS本体ドキュメント領域であり、CMS本体カウント対象外とすること。
+- `Docs/` は全体ドキュメント領域であり、CMS本体カウント対象外とすること。
 - `ServerSideLogicFramework/` はRepository CMS本体とは別責務の並行開発領域とし、同一リポジトリ内で開発コスト削減と開発効率化を優先して管理すること。
 - `ServerSideLogicFramework/` を別リポジトリへ分割する計画は廃止すること。
 - 現在のRepository CMSを活用し、サーバーサイドロジックフレームワーク部分と今後のCMS部分を段階的に分離して、フレームワーク安定版ができるまで進めること。
@@ -88,7 +97,7 @@
 - `RepositoryCMS/Core/Config/` は保護設定領域とし、アップデート時に上書き、削除、初期化しないこと。
 - `RepositoryCMS/Core/Config/` 直下にサブフォルダを作成しないこと。
 - `RepositoryCMS/Core/Config/` には認証情報、ログイン失敗状態、CMSロック状態、CMS状態、ユーザーテーマ設定を直下ファイルとして保存すること。
-- 開発元は `RepositoryCMS/Core/Config/`、`RepositoryCMS/Core/App/`、`RepositoryCMS/Modules/`、`RepositoryCMS/Work/`、`RepositoryCMS/Docs/`、コンテンツデータ、公開成果物、運用履歴に関与しないこと。
+- 開発元は `RepositoryCMS/Core/Config/`、`RepositoryCMS/Core/App/`、`RepositoryCMS/Modules/`、`RepositoryCMS/Work/`、`Docs/`、コンテンツデータ、公開成果物、運用履歴に関与しないこと。
 - `RepositoryCMS/Core/App/` は廃止方針とし、作成・維持しないこと。
 - 開発元公認セカンドパーティーモジュール計画は、優先事項の大幅な変更に伴い凍結とし、`RepositoryCMS/Modules/` を作成・維持しないこと。
 - 開発元公認セカンドパーティーモジュール計画は廃止ではなく凍結であり、将来的に復帰する場合は、先にマスター仕様へ復帰方針、責務境界、配置、権限、アップデート対象可否を明記し、承認後に設計・実装すること。

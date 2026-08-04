@@ -17,14 +17,22 @@ Server Side Logic Frameworkは、Repository CMSとは別責務の安全制御基
 # 2. 配置
 
 ```text
-ServerSideLogicFramework/
-  Docs/
-    Master_Spec
+Docs/
+  Project_Charter
+  Development_Plan
+  Brand_Color_Spec
+  ServerSideLogicFramework/
     Master_Design
     Change_History
+
+ServerSideLogicFramework/
   ServerSideLogicFramework.php
   ServerSideLogicFrameworkClient.php
 ```
+
+ServerSideLogicFrameworkのマスター仕様は `Docs/Project_Charter` に集約する。
+
+ServerSideLogicFrameworkのマスター設計と変更履歴は `Docs/ServerSideLogicFramework/` で個別管理する。
 
 `ServerSideLogicFramework/ServerSideLogicFramework.php` は、フレームワーク本体の単一ファイル正本とする。
 

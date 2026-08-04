@@ -4,6 +4,61 @@
 
 ---
 
+## v.0.35
+
+- 実装バージョンをv.0.16へ更新し、広告配信枠管理とナビゲーション管理を追加。
+- `Core/Config/ad_slots.json` と `Core/Config/navigation.json` の保全保存、管理者専用UI、静的生成HTML基本反映を追加。
+- release-checkへ広告、ナビ、v.0.16描画、静的生成反映検証を追加し、release-check-okを確認。
+
+---
+
+## v.0.34
+
+- ブログ機能本体をv.0.30実装対象へ戻し、v.0.29はブログ前提機能の最終整理へ変更。
+- `Docs/Development_Plan` と `Docs/Project_Charter` のブログ計画不整合を解消。
+
+---
+
+## v.0.33
+
+- GitHubリリース配布物に必要ファイルを同梱し、TypeScriptソースと保護対象を含めない方針を追加。
+- ServerSideLogicFramework本体は同梱し、Framework Client正本は配布物から除外する方針を明記。
+- `RELEASE_PACKAGE_ROOT` 指定時のrelease-check配布物検査を追加。
+
+---
+
+## v.0.32
+
+- TypeScript/JavaScript製移行をv.0.18以降に段階再開する現行方針へ統一。
+- 旧方針の「凍結中の開発計画へ戻らない」表現を整理。
+- AGENTSとProject_Charterの矛盾を解消し、Framework準拠と運用適合確認の維持を明記。
+
+---
+
+## v.0.31
+
+- TypeScript/JavaScript製移行バージョンでは、新機能、改良機能、移行機能を合計最大5項目まで扱える方針を追加。
+- 通常バージョンは原則1機能または2機能の方針を維持。
+- `Docs/Project_Charter` と `Docs/Development_Plan` へ反映。
+
+---
+
+## v.0.30
+
+- ルート直下 `Docs/` へ全ドキュメントを集約し、CMS設計と変更履歴を `Docs/RepositoryCMS/` へ移行。
+- マスター仕様を `Docs/Project_Charter` へ集約し、開発計画案を `Docs/Development_Plan` へ一元管理。
+- AGENTSとrelease-checkを新ドキュメント構成、旧Docsフォルダ廃止、ルート3系統原則へ更新。
+
+---
+
+## v.0.29
+
+- 実装バージョンをv.0.15へ更新し、日本語・英語の多言語化データと翻訳基盤を追加。
+- サイト基本設定をCore/Config/site.jsonへ保全保存し、管理者専用画面と静的生成HTML反映を追加。
+- release-checkへ言語キー一致、サイト設定保全、静的生成メタ反映検証を追加し、release-check-okを確認。
+
+---
+
 ## v.0.28
 
 - 実装バージョンをv.0.14へ更新し、v.0.14安定版リリース対象として整理。
@@ -198,7 +253,7 @@
 
 ## v.0.4
 
-- ブランドカラー仕様を `RepositoryCMS/Docs/Brand_Color_Spec` として分離し、読み込み対象ドキュメントに追加。
+- ブランドカラー仕様を `Docs/Brand_Color_Spec` として分離し、読み込み対象ドキュメントに追加。
 - 管理画面をダッシュボード化し、状態確認、操作導線、コンテンツ一覧を整理。
 - Master_SpecとMaster_Designをv.0.4へ更新。
 

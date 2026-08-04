@@ -1,0 +1,16 @@
+{
+  "locale": "en",
+  "name": "English",
+  "product": "Repository CMS",
+  "nav.dashboard": "Dashboard",
+  "nav.create": "Create",
+  "nav.generate": "Generate",
+  "nav.publish": "Publish",
+  "nav.site_settings": "Site Settings",
+  "nav.ad_slots": "Ad Slots",
+  "nav.navigation": "Navigation",
+  "nav.themes": "Themes",
+  "nav.updates": "Updates",
+  "nav.users": "Users",
+  "nav.logout": "Logout"
+}

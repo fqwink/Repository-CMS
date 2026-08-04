@@ -1,8 +1,28 @@
-# Repository CMS
+# Repository CMS / Server Side Logic Framework
 
-# マスター仕様書
+# プロジェクト憲章
 
-**Version:** v\.0\.14
+**Version:** v\.0\.16
+
+---
+
+# 0\. ドキュメント管理方針
+
+本憲章は、Repository CMSおよびServerSideLogicFrameworkのマスター仕様を集約する最上位文書である。
+
+全ドキュメントはリポジトリルート直下の `Docs/` で管理する。
+
+ドキュメント分類は以下とする。
+
+- プロジェクト憲章・マスター仕様: `Docs/Project_Charter`
+- 開発計画案: `Docs/Development_Plan`
+- ブランドカラー仕様: `Docs/Brand_Color_Spec`
+- Repository CMS設計・変更履歴: `Docs/RepositoryCMS/`
+- ServerSideLogicFramework設計・変更履歴: `Docs/ServerSideLogicFramework/`
+
+`Docs/Project_Charter`、`Docs/Development_Plan`、各 `Master_Design` の変更は、事前にユーザー承認を得てから行う。
+
+開発計画案は `Docs/Development_Plan` へ一元管理し、バージョンごとの計画は5行以内で簡潔にまとめる。
 
 ---
 
@@ -328,6 +348,61 @@ Gitを直接操作しない。
 
 ---
 
+# 11\.1 広告配信枠
+
+v\.0\.16では広告配信枠の基本管理を実装する。
+
+広告配信枠は、公開サイト上に広告または広告相当の表示領域を配置するためのCMS管理機能である。
+
+管理対象は以下とする。
+
+- 広告枠ID
+- 名称
+- 表示位置
+- 表示状態
+- 広告内容
+
+広告配信枠設定は利用者が管理する設定情報であり、開発元アップデートで上書き、削除、初期化しない。
+
+広告配信枠設定は `RepositoryCMS/Core/Config/ad_slots.json` に保存する。
+
+広告配信枠の変更は管理者のみ許可し、編集担当は変更できない。
+
+v\.0\.16では広告枠の基本管理までを対象とする。
+
+クリック計測、表示回数計測、ローテーション、配信スケジュール、外部広告タグの高度制御は対象外とする。
+
+広告配信枠設定の読込不能、JSON破損、不正値、保存後再読込不一致、チェックサム不一致は保全不能として扱い、保存または生成を止める。
+
+---
+
+# 11\.2 ナビゲーション管理
+
+v\.0\.16ではナビゲーション管理の基本機能を実装する。
+
+ナビゲーション管理は、公開サイト上に表示するメニュー項目を管理するためのCMS管理機能である。
+
+管理対象は以下とする。
+
+- メニュー項目名
+- 表示順
+- リンク先
+- 表示状態
+
+ナビゲーション設定は利用者が管理する設定情報であり、開発元アップデートで上書き、削除、初期化しない。
+
+ナビゲーション設定は `RepositoryCMS/Core/Config/navigation.json` に保存する。
+
+ナビゲーション設定の変更は管理者のみ許可し、編集担当は変更できない。
+
+v\.0\.16では単一ナビゲーションの基本管理までを対象とする。
+
+複数メニュー、階層メニュー、高度な条件表示は対象外とする。
+
+ナビゲーション設定の読込不能、JSON破損、不正値、保存後再読込不一致、チェックサム不一致は保全不能として扱い、保存または生成を止める。
+
+---
+
 # 12\. テンプレート
 
 CMS本体へ内蔵する。
@@ -368,6 +443,12 @@ public\_html/ は採用しない。
 
 ディレクトリ構成
 
+- Docs/
+  - Project_Charter
+  - Development_Plan
+  - Brand_Color_Spec
+  - RepositoryCMS/
+  - ServerSideLogicFramework/
 - RepositoryCMS/
   - Core/
     - app\.php
@@ -377,10 +458,11 @@ public\_html/ は採用しない。
     - Lang/
     - Themes/
   - Work/
-  - Docs/
 - ServerSideLogicFramework/
 
-リポジトリルート直下は RepositoryCMS/ と ServerSideLogicFramework/ の2系統を基本とする。
+リポジトリルート直下は Docs/、RepositoryCMS/、ServerSideLogicFramework/ の3系統を基本とする。
+
+Docs/ は全体ドキュメント領域であり、Repository CMS本体のルート直下フォルダ数制約には含めない。
 
 Repository CMS本体は RepositoryCMS/ で管理する。
 
@@ -390,8 +472,6 @@ RepositoryCMS/ 直下のRepository CMS本体カウント対象フォルダは最
 
 - Core/
 - Work/
-
-RepositoryCMS/Docs/ はドキュメント領域であり、RepositoryCMS/ 直下フォルダ数のカウント対象外とする。
 
 ServerSideLogicFramework/ はRepository CMS本体とは別責務の並行開発領域であり、Repository CMS本体のルート直下フォルダ数のカウント対象外とする。
 
@@ -469,6 +549,9 @@ RepositoryCMS/Core/Config/ には以下を含める。
 - CMSロック状態
 - CMS状態
 - ユーザーテーマ設定
+- サイト基本設定
+- 広告配信枠設定
+- ナビゲーション設定
 
 RepositoryCMS/Core/Config/ はアップデート時に上書き、削除、初期化しない。
 
@@ -514,9 +597,9 @@ ServerSideLogicFramework/ は同一リポジトリ内で恒久管理し、別リ
 
 ServerSideLogicFramework/ のドキュメントは以下で管理する。
 
-- ServerSideLogicFramework/Docs/Master_Spec
-- ServerSideLogicFramework/Docs/Master_Design
-- ServerSideLogicFramework/Docs/Change_History
+- Docs/Project_Charter
+- Docs/ServerSideLogicFramework/Master_Design
+- Docs/ServerSideLogicFramework/Change_History
 
 サーバーサイドロジックフレームワーク本体の実装コードは、単一ファイル原則として ServerSideLogicFramework/ServerSideLogicFramework.php に集約する。
 
@@ -526,15 +609,16 @@ ServerSideLogicFramework/ 直下の構成は以下とする。
 
 - ServerSideLogicFramework.php
 - ServerSideLogicFrameworkClient.php
-- Docs/
 
 Repository CMS本体側およびServerSideLogicFramework/直下の別PHPファイルには、サーバーサイドロジックフレームワーク関係の実装コード実体を残さない。
 
-Repository CMS本体のドキュメントは RepositoryCMS/Docs/ で管理し、ServerSideLogicFramework/Docs/ と混在させない。
+Repository CMS本体のドキュメントは Docs/RepositoryCMS/ で管理し、Docs/ServerSideLogicFramework/ と混在させない。
 
-Repository CMS本体に関する仕様、設計、変更履歴は RepositoryCMS/Docs/ で管理する。
+Repository CMS本体に関する設計、変更履歴は Docs/RepositoryCMS/ で管理する。
 
-サーバーサイドロジックフレームワークに関する仕様、設計、変更履歴は ServerSideLogicFramework/Docs/ で管理する。
+サーバーサイドロジックフレームワークに関する設計、変更履歴は Docs/ServerSideLogicFramework/ で管理する。
+
+マスター仕様は Docs/Project_Charter に集約する。
 
 ServerSideLogicFramework本体およびServerSideLogicFrameworkクライアントツールは、ServerSideLogicFramework開発元のみが開発、修正、保守、メンテナンス、配布する。
 
@@ -568,9 +652,7 @@ RepositoryCMS/Core/app.php は、認証、ロック、作業データ保全の�
 
 サーバーサイドロジックフレームワークに準拠する機能、仕様に基づいてRepository CMS本体を開発する。
 
-TypeScript/JavaScript製移行計画および凍結中の開発計画案は、サーバーサイドロジックフレームワーク原型作成と強化を優先するため一時凍結する。
-
-凍結中は、現在までのRepository CMS実装を活用し、サーバーサイドロジックフレームワーク原型とRepository CMS本体を段階的に分離する。
+TypeScript/JavaScript製移行計画は、サーバーサイドロジックフレームワーク原型作成と強化を優先するため一時凍結していたが、v\.0\.18から段階的に再開する。
 
 現在のRepository CMSは、サーバーサイドロジックフレームワーク部分と今後のCMS部分へ分離する対象とする。
 
@@ -578,15 +660,19 @@ TypeScript/JavaScript製移行計画および凍結中の開発計画案は、�
 
 サーバーサイドロジックフレームワーク部分には、認証、認可、一時ロック、セッション、CSRF、アップデート、メンテナンスモード、CMSロック、データ保全、サーバーサイド最終判定などの安全制御責務を分離候補として扱う。
 
-凍結中のRepository CMS本体の改良は、サーバーサイドロジックフレームワーク原型作成、フレームワーク強化、責務分離、既存CMS安定化に関係する範囲を優先する。
+Repository CMS本体の改良は、サーバーサイドロジックフレームワーク準拠、責務分離、既存CMS安定化、運用適合確認を維持して進める。
 
-サーバーサイドロジックフレームワーク原型が完成しても、凍結中の開発計画案へ直ちに戻らない。
+TypeScript/JavaScript製移行を進める場合も、Repository CMS本体との責務分離、フレームワーク準拠、運用安全性、データ保全、アップデート運用を優先する。
 
-サーバーサイドロジックフレームワーク安定版が完成しても、凍結中の開発計画案へ直ちに戻らない。
+TypeScript/JavaScript製移行は以下を原則とする。
 
-安定版完成後も、Repository CMS本体との責務分離、フレームワーク準拠、運用安全性、データ保全、アップデート運用、同一リポジトリ内での開発効率確認を優先する。
-
-凍結中の開発計画案の再開は、サーバーサイドロジックフレームワーク安定版とRepository CMS本体の運用適合性を確認した後、別途判断する。
+- Node\.js必須化はしない
+- Deno必須化はしない
+- 開発時はTypeScriptソースを管理対象にできる
+- リリース時はレンタルサーバで動作可能なJavaScript生成物を同封する
+- PHP側の `RepositoryCMS/Core/app.php` とServerSideLogicFramework連携は当面維持する
+- 認証、認可、CSRF、ロック、アップデート、保全判定はServerSideLogicFramework経由を維持する
+- v\.0\.18ではCMS管理画面のフロント側補助処理から段階移行を開始する
 
 ---
 
@@ -630,7 +716,7 @@ CMSは開発元リポジトリからアップデートリリース情報を取�
 
 開発元は `RepositoryCMS/Core/app.php`、`RepositoryCMS/Core/.htaccess`、`RepositoryCMS/Core/ServerSideLogicFrameworkClient.php`、テーマ関連ソースコード、多言語化データを更新、改良、バグ修正する。
 
-開発元は `RepositoryCMS/Core/Config/`、`RepositoryCMS/Modules/`、`RepositoryCMS/Work/`、`RepositoryCMS/Docs/`、コンテンツデータ、公開成果物、CMSサーバ運用履歴に関与しない。
+開発元アップデートは `RepositoryCMS/Core/Config/`、`RepositoryCMS/Modules/`、`RepositoryCMS/Work/`、`Docs/`、コンテンツデータ、公開成果物、CMSサーバ運用履歴に関与しない。
 
 RepositoryCMS/Core/ 内の開発元管理領域の扱いは以下とする。
 
@@ -647,19 +733,22 @@ RepositoryCMS/Core/ 内の開発元管理領域の扱いは以下とする。
 - RepositoryCMS/Core/Config/
 - RepositoryCMS/Core/Data/
 - RepositoryCMS/Work/
-- RepositoryCMS/Docs/
+- Docs/
 - 認証情報
 - ログイン失敗状態
 - CMSロック状態
 - CMS状態
 - ユーザーテーマ設定
+- サイト基本設定
+- 広告配信枠設定
+- ナビゲーション設定
 - コンテンツデータ
 - 公開成果物
 - CMSサーバ運用履歴
 
 アップデートは `Core/app.php`、`Core/.htaccess`、`Core/ServerSideLogicFrameworkClient.php`、`Core/Lang/`、`Core/Themes/` の置換・追加・修正として行う。
 
-アップデートによって、`RepositoryCMS/Core/Config/`、`RepositoryCMS/Core/App/`、`RepositoryCMS/Core/Data/`、`RepositoryCMS/Modules/`、`RepositoryCMS/Work/`、`RepositoryCMS/Docs/`、作業データ、認証情報、ログイン失敗状態、CMSロック状態、CMS状態、ユーザーテーマ設定、コンテンツデータ、公開成果物、運用履歴を変更してはならない。
+アップデートによって、`RepositoryCMS/Core/Config/`、`RepositoryCMS/Core/App/`、`RepositoryCMS/Core/Data/`、`RepositoryCMS/Modules/`、`RepositoryCMS/Work/`、`Docs/`、作業データ、認証情報、ログイン失敗状態、CMSロック状態、CMS状態、ユーザーテーマ設定、サイト基本設定、広告配信枠設定、ナビゲーション設定、コンテンツデータ、公開成果物、運用履歴を変更してはならない。
 
 ---
 
@@ -691,6 +780,26 @@ RepositoryCMS/Core/ 内の開発元管理領域の扱いは以下とする。
 - Coreファイルチェックサム
 - 必須PHPバージョン
 - リリース日時
+
+---
+
+# 23\.1 GitHubリリース同梱方針
+
+GitHubリポジトリでリリースを作成する際は、そのバージョンの実行、配布、検証に必要なファイルをすべて同梱する。
+
+リリースには `ServerSideLogicFramework/ServerSideLogicFramework.php` 本体を含める。
+
+リリースには `RepositoryCMS/Core/ServerSideLogicFrameworkClient.php` をCore組み込み済みクライアントとして含める。
+
+`ServerSideLogicFramework/ServerSideLogicFrameworkClient.php` 正本は開発元管理用であり、リリース配布物には含めない。
+
+TypeScriptソースコードはリリース配布物に含めない。
+
+TypeScript/JavaScript製移行後は、レンタルサーバで実行可能なJavaScript生成物のみをリリース配布物に含める。
+
+認証情報、トークン、秘密鍵、利用者データ、`RepositoryCMS/Core/Config/`、`RepositoryCMS/Work/`、`Docs/`、作業データ、公開成果物、運用履歴はリリース配布物に含めない。
+
+リリース前に `release-check.sh` で、必要ファイルの同梱漏れと禁止ファイルの混入を検査する。
 
 ---
 
@@ -755,7 +864,7 @@ Coreアップデートは適用前に検証する。
 - RepositoryCMS/Core/Config/ 内の保護設定が上書き、削除、初期化対象になっていないこと
 - RepositoryCMS/Modules/ が含まれていないこと
 - RepositoryCMS/Work/ が含まれていないこと
-- RepositoryCMS/Docs/ が含まれていないこと
+- Docs/ が含まれていないこと
 
 検証に失敗した場合、アップデートを中止する。
 
@@ -823,9 +932,13 @@ v\.1\.0は定義しない。
 
 各バージョンでは、原則として1機能または2機能のみを新機能または機能改良として扱う。
 
+TypeScript/JavaScript製移行を進めるバージョンでは例外として、新機能、改良機能、移行機能を合計最大5項目まで扱える。
+
+この例外を適用する場合も、データ保全、セキュリティ、運用基盤安定性を最優先する。
+
 仕様・設計・実装は同一バージョンで管理する。
 
-本仕様書に記載された内容を v\.0\.11 の対象範囲とする。
+本仕様書に記載された内容を v\.0\.16 の対象範囲とする。
 
 ---
 
@@ -841,7 +954,7 @@ v\.1\.0は定義しない。
 
 ただし、CMSとして必要な基本コンテンツ機能は、運用基盤優先の方針を維持したうえで段階的に前倒しできる。
 
-ブログ機能はv\.0\.30まで実装しない。
+ブログ機能本体はv\.0\.30で実装対象とし、v\.0\.29までは前提整理に留める。
 
 開発順序は以下を基本とする。
 
@@ -856,296 +969,7 @@ v\.1\.0は定義しない。
 
 ---
 
-# 33\. 累積開発計画
-
-v\.0\.4以降は、以下の累積開発計画を基本とする。
-
-## v\.0\.4
-
-管理画面改良を行う。
-
-状態確認、コンテンツ操作、静的生成、公開操作を管理画面上で整理する。
-
-v\.0\.4の詳細仕様は以下とする。
-
-- 管理画面トップをダッシュボード化する
-- CMS状態を表示する
-- 現在バージョンを表示する
-- ロック状態を表示する
-- メンテナンス状態を表示する
-- Gitプロバイダー設定状態を表示する
-- コンテンツ一覧を整理して表示する
-- 作成、編集、保存、履歴、復元、プレビュー、静的生成、公開の操作導線を整理する
-- アップデート通知領域を管理画面に配置する
-- 未認証、CMSロック中、メンテナンス中の表示を整理する
-- 管理画面は `RepositoryCMS/Docs/Brand_Color_Spec` に基づくブランドカラーを使用する
-- 管理画面は公開テーマの影響を受けない
-
-v\.0\.4では以下を対象外とする。
-
-- テーマ管理
-- 静的生成ロジックの大幅改良
-- 複数ユーザー
-- 広告配信枠
-- ブログ機能
-- 削除機能
-
-v\.0\.4のデータ保全方針は以下とする。
-
-- `RepositoryCMS/Core/Config/`、`RepositoryCMS/Work/`、コンテンツデータ、公開成果物は不要に変更しない
-- 管理画面改良で作業データを作成する場合は、保全確認後に削除する
-- 保全状態不明の場合は処理を止める
-
-v\.0\.4の認証認可方針は以下とする。
-
-- 既存の認証認可を維持する
-- 操作前の認可確認を維持する
-- 未認証状態ではログインと状態確認以外を許可しない
-- CMSロック中、メンテナンス中の許可操作を本仕様通りに制限する
-
-## v\.0\.5
-
-静的生成改良を行う。
-
-`.md`、`.json`、`.png`、`.svg` の生成・出力処理と生成結果の検証を強化する。
-
-v\.0\.5の詳細仕様は以下とする。
-
-- 静的生成結果をファイル単位で検証する
-- 生成対象パス、出力パス、拡張子、チェックサムを確認する
-- 生成件数を管理画面に表示する
-- 生成成功件数を管理画面に表示する
-- 生成失敗時は失敗理由を管理画面に表示する
-- `.md` は `.html` へ変換した結果を検証する
-- `.json` はJSONとして再解析可能であることを検証する
-- `.png` はPNGシグネチャを検証する
-- `.svg` はSVGとして扱える最小構造を検証する
-- 生成後の `RepositoryCMS/Work/` 作業データ保全確認を強化する
-- 保全確認後に作業データを削除する
-- 作業データ削除不能、削除状態不明、生成結果不明の場合はCMS全体をロックする
-
-v\.0\.5では以下を対象外とする。
-
-- テーマ管理
-- 複数ユーザー
-- 広告配信枠
-- ブログ機能
-- 削除機能
-- 公開テーマ切り替え
-
-v\.0\.5のデータ保全方針は以下とする。
-
-- 静的生成は `RepositoryCMS/Work/` 上の作業データとして行う
-- 生成結果は出力前に検証する
-- 公開リポジトリへ保存する場合は、保存、再取得、チェックサム一致まで確認する
-- 保全不能、整合性不明、保全状態不明の場合は処理を止め、CMS全体をロックする
-
-## v\.0\.6
-
-テーマ管理機能を実装する。
-
-3個の標準テーマを同梱し、静的生成時に使用テーマを選択できるようにする。
-
-v\.0\.6の詳細仕様は以下とする。
-
-- 標準テーマを3個同梱する
-- 標準テーマは `standard`、`blog`、`media` とする
-- 管理画面から有効テーマを1個選択できる
-- 有効テーマは静的生成時に使用する
-- 管理画面は公開テーマの影響を受けない
-- テーマは `RepositoryCMS/Docs/Brand_Color_Spec` のブランドカラートークンを参照できる
-- テーマ設定は保持データとして管理する
-- テーマ設定は作業データに含めない
-- テーマが存在しない、壊れている、検証不能な場合は静的生成を停止する
-- テーマ検証不能、テーマ適用状態不明の場合はCMS全体をロックする
-
-標準テーマの方針は以下とする。
-
-- `standard` は汎用サイト向けとし、Primaryを中心に使用する
-- `blog` は記事中心サイト向けとし、Secondaryを中心に使用する
-- `media` は情報発信・広告枠想定サイト向けとし、Accentを中心に使用する
-
-v\.0\.6では以下を対象外とする。
-
-- テーマ編集
-- テーマ削除
-- ユーザー独自テーマ追加
-- 複数ユーザー
-- 広告配信枠
-- ブログ機能
-
-v\.0\.6のデータ保全方針は以下とする。
-
-- テーマ選択状態は保持データとして保存する
-- テーマ選択状態を保存する場合は、保存、再取得、整合性確認を行う
-- 静的生成時にテーマを適用する場合は、テーマ検証後に生成する
-- 保全不能、整合性不明、テーマ状態不明の場合は処理を止め、CMS全体をロックする
-
-## v\.0\.7
-
-アップデート通知・リリース一覧機能を実装する。
-
-開発元リポジトリからアップデートリリース一覧を取得し、管理画面に通知する。
-
-## v\.0\.8
-
-アップデート選択・事前検証機能を実装する。
-
-管理者が任意のアップデートリリースを選択し、適用前に環境、対象バージョン、対象ファイル、チェックサム、禁止パスを検証する。
-
-v\.0\.8ではアップデート適用、メンテナンスモード切り替え、Core更新ファイルの書き込みは行わない。
-
-## v\.0\.9
-
-アップデート適用・メンテナンスモード制御を実装する。
-
-アップデート開始時にメンテナンスモードへ切り替え、検証済みCore更新ファイルを適用する。
-
-アップデート適用は、リポジトリ上では `RepositoryCMS/Core/app.php`、`RepositoryCMS/Core/.htaccess`、`RepositoryCMS/Core/ServerSideLogicFrameworkClient.php`、`RepositoryCMS/Core/Lang/`、`RepositoryCMS/Core/Themes/` のみへ書き込む。リリースマニフェストではCMSルート相対の `Core/app.php`、`Core/.htaccess`、`Core/ServerSideLogicFrameworkClient.php`、`Core/Lang/`、`Core/Themes/` を使う。
-
-## v\.0\.10
-
-アップデート保全・失敗時ロック・復帰確認強化を行う。
-
-アップデート後の整合性確認、失敗時CMSロック、メンテナンス解除待機、5分後の公開モード復帰を強化する。
-
-アップデート用作業データは保全確認後に削除する。
-
-## v\.0\.11
-
-複数ユーザー最小構成を実装する。
-
-管理者1人、編集担当2人の計3人に対応する。
-
-ユーザー管理は管理者のみ実行できる。
-
-## v\.0\.12
-
-バグ修正・安定化リリースを行う。
-
-新機能追加は行わず、既存実装範囲の不具合修正、検証強化、リリース品質向上を対象とする。
-
-## v\.0\.13
-
-バグ修正・安定化リリースを行う。
-
-v\.0\.12後の追加修正、運用確認、リリース前後の品質改善を対象とする。
-
-## v\.0\.14
-
-安定版リリースを行う。
-
-新機能追加は行わず、既存実装範囲の不具合修正、検証強化、リリース品質向上を対象とする。
-
-管理画面のログイン画面とダッシュボード描画をrelease-checkで検証する。
-
-広告配信枠機能はv\.0\.14では実装しない。
-
-## v\.0\.15
-
-多言語化機能を実装する。
-
-CMSサーバおよび管理画面の表示文言を多言語化できるようにする。
-
-## v\.0\.16
-
-WYSIWYGエディタを計画対象とする。
-
-WYSIWYGエディタの詳細仕様は、方式決定後にマスター仕様へ明記し、承認後に開発する。
-
-## v\.0\.17
-
-サイト基本設定機能を実装する。
-
-サイト名、説明文、公開URL、言語、基本メタ情報を扱う。
-
-## v\.0\.18
-
-ナビゲーション管理機能を実装する。
-
-メニュー項目、表示順、リンク先を管理する。
-
-## v\.0\.19
-
-固定ページ管理改良を行う。
-
-ページ一覧、公開状態、表示順の管理を強化する。
-
-## v\.0\.20
-
-画像・SVG素材管理改良を行う。
-
-`.png`、`.svg` の管理画面整理を行う。
-
-## v\.0\.21
-
-テーマ表示設定改良を行う。
-
-テーマごとの表示項目、色トークン適用範囲を調整する。
-
-## v\.0\.22
-
-広告配信枠改良を行う。
-
-広告枠の管理、表示制御、静的生成時の差し込みを強化する。
-
-## v\.0\.23
-
-静的生成SEO改良を行う。
-
-基本メタ情報、ページ別メタ情報、静的生成時のSEO出力を強化する。
-
-## v\.0\.24
-
-公開前プレビュー改良を行う。
-
-公開前の確認画面、テーマ適用状態、生成予定内容の確認を強化する。
-
-## v\.0\.25
-
-運用履歴表示改良を行う。
-
-CMSサーバ運用履歴を管理画面で確認しやすくする。
-
-## v\.0\.26
-
-アップデート履歴表示改良を行う。
-
-アップデート実行履歴、成功状態、失敗理由を管理画面で確認しやすくする。
-
-## v\.0\.27
-
-データ保全レポート改良を行う。
-
-保存、再取得、チェックサム確認、作業データ削除状態を確認しやすくする。
-
-## v\.0\.28
-
-ブログ準備機能を実装する。
-
-記事用データ構造、ルーティング方針、テーマ表示枠を準備する。
-
-ブログ投稿機能そのものは実装しない。
-
-## v\.0\.29
-
-ブログ前提機能の最終整理を行う。
-
-記事一覧、記事詳細、公開日、下書き状態を扱うための仕様整合性を確認する。
-
-## v\.0\.30
-
-ブログ機能を実装する。
-
-記事作成、記事一覧、記事詳細、公開日、下書き状態を扱う。
-
-## v\.0\.31以降
-
-1機能または2機能ずつ、累積改良を継続する。
-
----
-
-# 34\. 将来機能
+# 33\. 将来機能
 
 初期版では実装しない。
 
@@ -1167,4 +991,369 @@ CMSサーバ運用履歴を管理画面で確認しやすくする。
 
 必要になった時点で追加する。
 
-将来機能は、マスター仕様書に仕様を明記し、承認後に開発する。
+将来機能は、`Docs/Project_Charter` に仕様を明記し、承認後に開発する。
+
+---
+
+# 34. ServerSideLogicFrameworkマスター仕様集約
+
+以下は旧 `ServerSideLogicFramework/Docs/Master_Spec` の内容を、マスター仕様集約方針に基づいて退避・統合したものである。
+
+# 34.1 Server Side Logic Framework
+
+**Version:** v.0.6
+
+---
+
+# 1. 製品概要
+
+Server Side Logic Frameworkは、Repository CMSと並行開発するサーバーサイド安全制御基盤である。
+
+Repository CMSリポジトリ内で恒久管理し、別リポジトリへ分割しない。
+
+別リポジトリ分割計画は、開発コスト削減と開発効率化を優先するため廃止する。
+
+---
+
+# 2. 基本方針
+
+- Repository CMS本体とは別責務として扱う
+- 利用者データ資産を所有しない
+- データ保全とセキュリティを最優先、最重視する
+- ルート直下の `ServerSideLogicFramework/` で管理する
+- フレームワーク専用ドキュメントは `Docs/ServerSideLogicFramework/` で管理する
+- フレームワーク本体は `ServerSideLogicFramework/ServerSideLogicFramework.php` の単一ファイル原則とする
+- ServerSideLogicFrameworkクライアントツール正本は `ServerSideLogicFramework/ServerSideLogicFrameworkClient.php` の単一ファイル原則とする
+- Repository CMSとの連携は単一エントリーポイント経由方式を廃止し、クライアントツール経由の内部API方式とする
+- Repository CMSはServerSideLogicFrameworkクライアントツールを組み込まない場合、起動および動作してはならない
+- ServerSideLogicFramework本体およびクライアントツールは、ServerSideLogicFramework開発元のみが開発、修正、保守、メンテナンス、配布する
+- 別リポジトリ分割を前提にせず、CMS本体と責務を混在させない
+- 採用する場合、Repository CMSは本フレームワークの仕様および機能に準拠する
+- Repository CMS本体のTypeScript/JavaScript製移行計画は、v.0.18以降に段階的に進める
+- TypeScript/JavaScript製移行中も、Repository CMS本体との責務分離と運用適合確認を維持する
+- 現在のRepository CMSを活用し、サーバーサイドロジックフレームワーク部分と今後のCMS部分を段階的に分離する
+- 分離作業は、本フレームワーク安定版ができるまで継続する
+
+---
+
+# 2.1 共通思想
+
+Repository CMSとServerSideLogicFrameworkは、利用者のコンテンツデータ、データベース、公開成果物、運用履歴などのデータ資産を所有しない。
+
+すべてのデータ資産は利用者に帰属する。
+
+Repository CMSとServerSideLogicFrameworkは、利用者のデータ資産を安全に扱うための操作基盤、制御基盤であり、データそのものを保持、支配、囲い込みしない。
+
+仕様、設計、実装の最上位思想は以下とする。
+
+1. データ保全
+2. セキュリティ
+3. 利用者データ資産の非所有
+4. 責務分離
+5. 長期保守
+6. シンプル
+
+コンテンツデータ、データベース、公開成果物、運用履歴、認証に関わる保持情報、利用者が作成または管理する設定情報は、利用者のデータ資産である。
+
+ServerSideLogicFrameworkは、利用者のデータ資産を開発元の所有物として扱わない。
+
+ServerSideLogicFramework改良、バグ修正、Repository CMS本体との連携変更は、利用者のデータ資産を上書き、削除、初期化、移動、改変してはならない。
+
+例外的に削除義務があるものは作業データのみとする。
+
+作業データは利用者の正式なデータ資産ではなく、保全確認後に完全削除すべき一時データとして扱う。
+
+---
+
+# 2.2 ServerSideLogicFrameworkの概念
+
+ServerSideLogicFrameworkは、利用者のデータ資産を所有せず、Repository CMSが利用者データを扱う際の安全制御を担うサーバーサイドロジック基盤である。
+
+ServerSideLogicFrameworkの主目的は、CMS本体から安全制御責務を分離し、認証、認可、CSRF、ロック、アップデート、作業データ保全などの最終判定を一元管理することである。
+
+ServerSideLogicFrameworkの責務は、利用者データ資産に対する操作が安全かどうかを判定し、不明状態、保全不能、セキュリティ上の危険がある場合に処理を止めることである。
+
+ServerSideLogicFrameworkは、その操作を安全に実行してよいかを担当する。
+
+ServerSideLogicFrameworkは、コンテンツデータ、データベース、公開成果物、運用履歴などの利用者データ資産を保持、所有、支配しない。
+
+---
+
+# 2.3 Repository CMSとの責務境界
+
+Repository CMSは、利用者が何を操作するかを担当する。
+
+ServerSideLogicFrameworkは、その操作を安全に実行してよいかを担当する。
+
+Repository CMSは、ServerSideLogicFrameworkに準拠して開発する。
+
+Repository CMSは、ServerSideLogicFramework内部クラスを直接呼び出さず、CMS側へ組み込まれたServerSideLogicFrameworkクライアントツールを通じて内部APIを利用する。
+
+ServerSideLogicFrameworkは、Repository CMSの操作に対してサーバーサイド最終判定を行う。
+
+Repository CMSとServerSideLogicFrameworkのどちらも、利用者のデータ資産を所有する責務を持たない。
+
+データ保全とセキュリティに反する場合、機能性、利便性、開発効率よりも停止、ロック、保全確認を優先する。
+
+---
+
+# 3. 実行方針
+
+サーバーサイドロジックフレームワークは、外部公開APIサーバーとして扱わない。
+
+JSON外部API、REST外部API、fetch前提の外部公開APIを持たない。
+
+Repository CMSとの連携では、ServerSideLogicFrameworkクライアントツール経由の内部API実行環境を持つ。
+
+内部APIはServerSideLogicFrameworkの安全制御を実行するための非公開連携方式であり、外部公開APIとして扱わない。
+
+---
+
+# 4. 内部API経由方式
+
+Repository CMSとの連携は、単一エントリーポイント経由方式を廃止し、内部API経由方式へ変更する。
+
+ServerSideLogicFrameworkは内部API実行環境を持つ。
+
+Repository CMSは、ServerSideLogicFrameworkクライアントツールをCoreへ組み込む。
+
+Repository CMSからServerSideLogicFrameworkへのアクセスは、Coreへ組み込まれたServerSideLogicFrameworkクライアントツール経由のみとする。
+
+ServerSideLogicFrameworkクライアントツールが未組み込みの場合、Repository CMSは起動および動作してはならない。
+
+Repository CMSは、ServerSideLogicFramework本体および内部クラスを直接呼び出してはならない。
+
+---
+
+# 4.1 クライアントツール正本
+
+ServerSideLogicFrameworkクライアントツール正本は、ServerSideLogicFramework/ServerSideLogicFrameworkClient.php とする。
+
+ServerSideLogicFrameworkクライアントツール正本は、単一ファイル原則とする。
+
+Repository CMSは、ServerSideLogicFrameworkクライアントツール正本をコピーしてCoreへ組み込まなければならない。
+
+Repository CMS側の組み込み先は RepositoryCMS/Core/ServerSideLogicFrameworkClient.php とする。
+
+Repository CMSは、独自作成、独自改変、部分改変、再実装したクライアントツールを使用してはならない。
+
+CMS側クライアントツールが未配置、破損、改変、不一致、互換性不一致、出所不明、署名不一致、チェックサム不一致の場合、Repository CMSは起動および動作してはならない。
+
+ServerSideLogicFramework本体およびServerSideLogicFrameworkクライアントツールは、ServerSideLogicFramework開発元のみが開発、修正、保守、メンテナンス、配布する。
+
+Repository CMS開発元、開発元公認セカンドパーティーモジュール開発者、エンドユーザーは、ServerSideLogicFramework本体およびクライアントツールを独自に開発、改変、再実装、配布してはならない。
+
+---
+
+# 5. 対象機能
+
+本フレームワークの対象機能は以下とする。
+
+- 認証
+- 認可
+- 一時ロック
+- セッション
+- CSRF
+- アップデート
+- メンテナンスモード
+- サーバーサイド最終判定
+
+---
+
+# 6. 対象外
+
+以下は本フレームワークの対象外とする。
+
+- CMS本体
+- 管理画面
+- WYSIWYGエディタ
+- 静的生成ジェネレーター
+- Gitプロバイダー連携UI
+- テーマ管理UI
+- 広告配信枠管理UI
+- 多言語UI
+- プレビュー
+- 生成レポート
+
+---
+
+# 7. 原型作成と強化
+
+本フレームワークの原型は、現在までのRepository CMS実装を活用して作成する。
+
+原型作成では、既存CMS実装からサーバーサイド安全制御に関わる処理を原型素材として扱う。
+
+原型完成後も、本フレームワークの強化を継続する。
+
+安定版完成後も、Repository CMS本体との責務分離、運用安全性、データ保全、アップデート運用、同一リポジトリ内での開発効率確認を優先する。
+
+Repository CMS本体の開発計画は、Framework準拠とRepository CMS本体の運用適合性を維持して進める。
+
+---
+
+# 8. 分離実装計画
+
+サーバーサイドロジックフレームワーク本体の実装コードは、ServerSideLogicFramework/ServerSideLogicFramework.php に集約する。
+
+ServerSideLogicFrameworkクライアントツール正本は、ServerSideLogicFramework/ServerSideLogicFrameworkClient.php に集約する。
+
+Repository CMS本体側およびServerSideLogicFramework/直下の別PHPファイルには、サーバーサイドロジックフレームワーク関係の実装コード実体を残さない。
+
+分離実装計画では、現在までのRepository CMS実装を分析対象とし、以下を整理する。
+
+- サーバーサイド安全制御に該当する責務
+- Repository CMS本体に残す責務
+- フレームワーク化する責務
+- フレームワーク対象外とする責務
+- 内部API経由方式の前提
+- 外部公開APIサーバーにしない前提
+- クライアントツール正本コピー必須の前提
+- ページ要求およびフォームPOSTで扱う処理
+- データ保全、CMSロック、メンテナンスモードとの関係
+
+---
+
+# 9. 段階計画
+
+Server Side Logic Frameworkは、以下の段階で進める。
+
+## Phase 1: 既存CMS分析
+
+現在までのRepository CMS実装を分析し、フレームワーク原型に活用できる責務を分類する。
+
+この段階では既存CMS実装からフレームワーク対象責務を洗い出す。
+
+## Phase 2: 責務境界整理
+
+サーバーサイドロジックフレームワーク対象、Repository CMS本体対象、対象外を明確にする。
+
+認証、認可、一時ロック、セッション、CSRF、アップデート、メンテナンスモード、CMSロック、データ保全、サーバーサイド最終判定の関係を整理する。
+
+## Phase 3: 原型仕様確定
+
+原型で扱う最小機能、扱わない機能、RepositoryCMS/Core/app.phpとの連携前提を確定する。
+
+原型仕様確定後、フレームワーク対象コードはServerSideLogicFramework/へ分離配置する。
+
+## Phase 4: 分離実装
+
+ServerSideLogicFramework/ServerSideLogicFramework.php へ、認証、認可、ロック、CSRF、アップデート、作業データ保全の実装を配置する。
+
+配置後、Repository CMS本体側およびServerSideLogicFramework/直下の別PHPファイルにフレームワーク関係コード実体を残さない。
+
+## Phase 5: 強化
+
+原型作成後、セキュリティ、データ保全、メンテナンス、アップデート、CMS本体との責務分離を強化する。
+
+## Phase 6: 安定版
+
+安定版完成後も、CMS本体との運用適合性を確認する。
+
+---
+
+# 10. 優先事項
+
+当面の最優先事項は、Server Side Logic Frameworkの責務整理、仕様整理、設計整理、分離実装、安定化である。
+
+Repository CMS本体のTypeScript/JavaScript製移行計画は、v.0.18以降に段階的に進める。
+
+Repository CMS本体は、Server Side Logic Frameworkの仕様および機能に準拠して開発する。
+
+Repository CMS本体は、フレームワーク内部クラスを直接呼び出さず、Coreへ組み込まれたServerSideLogicFrameworkクライアントツールを通じて内部APIを利用する。
+
+---
+
+# 11. 現在CMSからの分離方針
+
+現在のRepository CMS実装は、Server Side Logic Framework原型の素材として活用する。
+
+現在のRepository CMSから、サーバーサイド安全制御に該当する責務をServer Side Logic Framework候補として分離する。
+
+Repository CMS本体に残す責務は、今後のCMS部分として整理する。
+
+分離は一括移行ではなく、原型作成、責務整理、強化、安定版作成の各段階で進める。
+
+---
+
+# 12. 分離対象
+
+Server Side Logic Framework候補は以下とする。
+
+- 認証
+- 認可
+- 一時ロック
+- セッション
+- CSRF
+- アップデート
+- メンテナンスモード
+- CMSロック
+- データ保全
+- 作業データ保全
+- サーバーサイド最終判定
+- 内部API経由方式
+- クライアントツール正本コピー
+
+今後のRepository CMS部分は以下とする。
+
+- 管理画面
+- コンテンツ管理
+- 静的生成
+- Gitプロバイダー連携
+- テーマ管理
+- 公開制御
+- 生成レポート
+- CMS固有UI
+- CMS固有画面遷移
+
+---
+
+# 13. 安定版までの進行
+
+Server Side Logic Frameworkは、安定版ができるまで以下を継続する。
+
+- 既存CMS実装の分析
+- フレームワーク候補責務の整理
+- CMS本体責務の整理
+- ドキュメント分離
+- 内部API経由方式の確認
+- 外部公開APIサーバー非採用方針の確認
+- クライアントツール正本コピー一致確認
+- データ保全とCMSロックの整合性確認
+- アップデートとメンテナンスモードの整合性確認
+
+安定版完成後も、Repository CMS本体への運用適合確認を継続する。
+
+---
+
+# 14. 分離実装
+
+分離実装では、以下の単一ファイルをサーバーサイド安全制御フレームワークとする。
+
+- ServerSideLogicFramework/ServerSideLogicFramework.php
+- ServerSideLogicFramework/ServerSideLogicFrameworkClient.php
+
+ServerSideLogicFramework/ServerSideLogicFramework.php には、フレームワーク内部クラスをすべて集約する。
+
+ServerSideLogicFramework/ServerSideLogicFrameworkClient.php には、Repository CMSへコピーして組み込むクライアントツール正本を集約する。
+
+フレームワークは以下を担当する。
+
+- 起動時安全制御
+- メンテナンス解除待機判定
+- 認証
+- ログイン要求
+- 認可
+- CSRF
+- CMSロック
+- アップデート検証
+- アップデート適用
+- 作業データ保全
+- HTTPメソッド判定
+
+フレームワークは外部公開APIサーバーではない。
+
+フレームワークは内部API実行環境を持ち、Repository CMSはCoreへ組み込まれたServerSideLogicFrameworkクライアントツール経由で利用する。
+
+Repository CMS本体は、フレームワーク仕様および機能に準拠して開発する。
+
+Repository CMS本体から利用する窓口は ServerSideLogicFrameworkClient とし、ServerSideLogicFramework本体および内部クラスは直接呼び出さない。

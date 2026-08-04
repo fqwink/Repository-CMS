@@ -86,9 +86,10 @@ fi
 
 echo "== Root directory count =="
 root_dirs=$(find . -mindepth 1 -maxdepth 1 -type d ! -name '.git' -print | sed 's#^\./##' | sort)
-if [ "$root_dirs" != "RepositoryCMS
+if [ "$root_dirs" != "Docs
+RepositoryCMS
 ServerSideLogicFramework" ]; then
-  echo "Repository root directories must be RepositoryCMS and ServerSideLogicFramework:" >&2
+  echo "Repository root directories must be Docs, RepositoryCMS and ServerSideLogicFramework:" >&2
   echo "$root_dirs" >&2
   exit 1
 fi
@@ -113,12 +114,61 @@ Themes" ]; then
 fi
 
 echo "== Prohibited directories =="
-for dir in "$CMS_DIR/Core/App" "$CMS_DIR/Core/Data" "$CMS_DIR/Modules"; do
+for dir in "$CMS_DIR/Core/App" "$CMS_DIR/Core/Data" "$CMS_DIR/Modules" "$CMS_DIR/Docs" "ServerSideLogicFramework/Docs"; do
   if [ -e "$dir" ]; then
     echo "Prohibited or frozen directory exists: $dir" >&2
     exit 1
   fi
 done
+
+echo "== Documentation structure =="
+for file in Docs/Project_Charter Docs/Development_Plan Docs/Brand_Color_Spec Docs/RepositoryCMS/Master_Design Docs/RepositoryCMS/Change_History Docs/ServerSideLogicFramework/Master_Design Docs/ServerSideLogicFramework/Change_History; do
+  if [ ! -f "$file" ]; then
+    echo "Required documentation file is missing: $file" >&2
+    exit 1
+  fi
+done
+
+echo "== Release package policy =="
+if [ -n "${RELEASE_PACKAGE_ROOT:-}" ]; then
+  package_root=$RELEASE_PACKAGE_ROOT
+  if [ ! -d "$package_root" ]; then
+    echo "RELEASE_PACKAGE_ROOT is not a directory: $package_root" >&2
+    exit 1
+  fi
+  for file in \
+    "$CMS_DIR/Core/app.php" \
+    "$CMS_DIR/Core/.htaccess" \
+    "$CMS_DIR/Core/ServerSideLogicFrameworkClient.php" \
+    "$CMS_DIR/Core/Lang/ja.json" \
+    "$CMS_DIR/Core/Lang/en.json" \
+    "$CMS_DIR/Core/Themes/standard.json" \
+    "$CMS_DIR/Core/Themes/blog.json" \
+    "$CMS_DIR/Core/Themes/media.json" \
+    "ServerSideLogicFramework/ServerSideLogicFramework.php"; do
+    if [ ! -f "$package_root/$file" ]; then
+      echo "Release package is missing required file: $file" >&2
+      exit 1
+    fi
+  done
+  for path in \
+    "ServerSideLogicFramework/ServerSideLogicFrameworkClient.php" \
+    "$CMS_DIR/Core/Config" \
+    "$CMS_DIR/Work" \
+    "Docs"; do
+    if [ -e "$package_root/$path" ]; then
+      echo "Release package contains prohibited path: $path" >&2
+      exit 1
+    fi
+  done
+  if find "$package_root" -type f -name '*.ts' -print | grep . >/dev/null 2>&1; then
+    echo "Release package must not contain TypeScript source files." >&2
+    find "$package_root" -type f -name '*.ts' -print >&2
+    exit 1
+  fi
+else
+  echo "RELEASE_PACKAGE_ROOT not set; skipped release package artifact check."
+fi
 
 echo "== Core/Config structure =="
 if find "$CMS_DIR/Core/Config" -mindepth 1 -type d -print | grep . >/dev/null 2>&1; then
@@ -128,7 +178,7 @@ if find "$CMS_DIR/Core/Config" -mindepth 1 -type d -print | grep . >/dev/null 2>
 fi
 
 echo "== Developer managed resources =="
-for file in "$CMS_DIR"/Core/Lang/ja.json "$CMS_DIR"/Core/Themes/standard.json "$CMS_DIR"/Core/Themes/blog.json "$CMS_DIR"/Core/Themes/media.json; do
+for file in "$CMS_DIR"/Core/Lang/ja.json "$CMS_DIR"/Core/Lang/en.json "$CMS_DIR"/Core/Themes/standard.json "$CMS_DIR"/Core/Themes/blog.json "$CMS_DIR"/Core/Themes/media.json; do
   if [ ! -f "$file" ]; then
     echo "Required developer managed resource is missing: $file" >&2
     exit 1
@@ -152,10 +202,10 @@ else
   echo "git not found; skipped tracked config check."
 fi
 
-echo "== Future content features not exposed in v0.14 stable =="
-if grep -n -E 'blog_post|ad_slot|広告枠を作成|ブログ投稿' "$CMS_DIR/Core/app.php" AGENTS.md >/dev/null 2>&1; then
-  echo "future content feature code or UI is exposed in v0.14 stable." >&2
-  grep -n -E 'blog_post|ad_slot|広告枠を作成|ブログ投稿' "$CMS_DIR/Core/app.php" AGENTS.md >&2
+echo "== Future content features not exposed in v0.16 =="
+if grep -n -E 'blog_post|ブログ投稿' "$CMS_DIR/Core/app.php" AGENTS.md >/dev/null 2>&1; then
+    echo "future content feature code or UI is exposed in v0.16." >&2
+  grep -n -E 'blog_post|ブログ投稿' "$CMS_DIR/Core/app.php" AGENTS.md >&2
   exit 1
 fi
 
@@ -261,7 +311,10 @@ function render_runtime(string $base): Runtime
     mkdir($base . '/config', 0700, true);
     mkdir($base . '/work', 0700, true);
     mkdir($base . '/core', 0700, true);
+    mkdir($base . '/core/Lang', 0700, true);
     file_put_contents($base . '/work/.gitignore', '');
+    copy('RepositoryCMS/Core/Lang/ja.json', $base . '/core/Lang/ja.json');
+    copy('RepositoryCMS/Core/Lang/en.json', $base . '/core/Lang/en.json');
     $auth = new Auth($base . '/config/auth.json', $base . '/config/login_state.json', $base . '/config/admin_initial_state.json');
     $locks = new LockManager($base . '/config/cms_lock.json');
     $workData = new WorkData($base . '/work', $locks);
@@ -277,7 +330,7 @@ $runtime = render_runtime(sys_get_temp_dir() . '/repository-cms-render-login-' .
 ob_start();
 (new App($runtime))->handle();
 $loginHtml = ob_get_clean();
-if (!is_string($loginHtml) || !str_contains($loginHtml, 'ログイン') || !str_contains($loginHtml, 'v.0.14')) {
+if (!is_string($loginHtml) || !str_contains($loginHtml, 'ログイン') || !str_contains($loginHtml, 'v.0.16')) {
     fwrite(STDERR, "login render failed\n");
     exit(1);
 }
@@ -292,12 +345,122 @@ $runtime->serverSideClient->login('owner', 'Password123456');
 ob_start();
 (new App($runtime))->handle();
 $dashboardHtml = ob_get_clean();
-if (!is_string($dashboardHtml) || !str_contains($dashboardHtml, 'ダッシュボード') || !str_contains($dashboardHtml, 'v.0.14')) {
+if (!is_string($dashboardHtml) || !str_contains($dashboardHtml, 'ダッシュボード') || !str_contains($dashboardHtml, 'v.0.16') || !str_contains($dashboardHtml, '広告配信枠') || !str_contains($dashboardHtml, 'ナビゲーション')) {
     fwrite(STDERR, "dashboard render failed\n");
     exit(1);
 }
 
 echo "app-render-ok\n";
+PHP
+
+echo "== Language and site settings =="
+"$PHP_BIN" <<'PHP'
+<?php
+define('REPOSITORY_CMS_NO_RUN', true);
+require 'RepositoryCMS/Core/app.php';
+
+use RepositoryCms\Core\AdSlots;
+use RepositoryCms\Core\Config;
+use RepositoryCms\Core\GitProvider;
+use RepositoryCms\Core\LanguageManager;
+use RepositoryCms\Core\NavigationSettings;
+use RepositoryCms\Core\Runtime;
+use RepositoryCms\Core\SiteSettings;
+use ServerSideLogicFramework\Auth;
+use ServerSideLogicFramework\LockManager;
+use ServerSideLogicFramework\ServerSideLogicFramework;
+use ServerSideLogicFramework\ServerSideLogicFrameworkClient;
+use ServerSideLogicFramework\WorkData;
+
+final class ReleaseCheckSiteGit implements GitProvider
+{
+    public function configured(): bool { return true; }
+    public function listContent(): array { return []; }
+    public function readContent(string $path): string { return ''; }
+    public function readContentAt(string $path, string $ref): string { return ''; }
+    public function saveContent(string $path, string $bytes, string $message): void {}
+    public function history(string $path): array { return []; }
+    public function readPublicContent(string $path): string { return ''; }
+    public function savePublicContent(string $path, string $bytes, string $message): void {}
+    public function saveOperationLog(array $event): void {}
+    public function listUpdateReleases(): array { return []; }
+    public function readUpdateFile(string $path): string { return ''; }
+}
+
+$base = sys_get_temp_dir() . '/repository-cms-site-' . bin2hex(random_bytes(4));
+mkdir($base . '/core/Config', 0700, true);
+mkdir($base . '/core/Lang', 0700, true);
+mkdir($base . '/work', 0700, true);
+file_put_contents($base . '/work/.gitignore', '');
+copy('RepositoryCMS/Core/Lang/ja.json', $base . '/core/Lang/ja.json');
+copy('RepositoryCMS/Core/Lang/en.json', $base . '/core/Lang/en.json');
+
+LanguageManager::assertLanguageFiles('RepositoryCMS/Core/Lang');
+$translator = new LanguageManager('RepositoryCMS/Core/Lang', 'en');
+if ($translator->t('nav.site_settings') !== 'Site Settings' || $translator->t('nav.ad_slots') !== 'Ad Slots' || $translator->t('nav.navigation') !== 'Navigation') {
+    fwrite(STDERR, "language translation failed\n");
+    exit(1);
+}
+
+$locks = new LockManager($base . '/core/Config/cms_lock.json');
+$auth = new Auth($base . '/core/Config/auth.json', $base . '/core/Config/login_state.json', $base . '/core/Config/admin_initial_state.json');
+$workData = new WorkData($base . '/work', $locks);
+$config = new Config('github', 'token', 'owner', 'content', 'public', 'ops', 'updates', 'main', 'updates/releases.json', 'main');
+$runtime = new Runtime($base . '/core', $base . '/core/Config', $base . '/work', $config, new ReleaseCheckSiteGit(), new ServerSideLogicFrameworkClient(new ServerSideLogicFramework($auth, $locks, $workData)));
+
+$settings = SiteSettings::save($runtime, [
+    'site_name' => 'Example Site',
+    'site_description' => 'Example Description',
+    'public_url' => 'https://example.com',
+    'site_language' => 'en',
+    'meta_title' => 'Example Title',
+    'meta_description' => 'Example Meta',
+]);
+$read = SiteSettings::read($runtime);
+if ($settings->toArray() !== $read->toArray() || $read->siteLanguage !== 'en') {
+    fwrite(STDERR, "site settings conservation failed\n");
+    exit(1);
+}
+if (trim(file_get_contents($base . '/core/Config/site.json') ?: '') === '') {
+    fwrite(STDERR, "site settings file missing\n");
+    exit(1);
+}
+
+$adSlots = AdSlots::save($runtime, [
+    'slots' => [
+        ['id' => 'header_main', 'name' => 'Header', 'position' => 'header', 'enabled' => true, 'content' => 'Ad Text'],
+    ],
+]);
+$readAdSlots = AdSlots::read($runtime);
+if ($adSlots->toArray() !== $readAdSlots->toArray() || count($readAdSlots->enabled()) !== 1) {
+    fwrite(STDERR, "ad slots conservation failed\n");
+    exit(1);
+}
+
+$navigation = NavigationSettings::save($runtime, [
+    'items' => [
+        ['label' => 'Home', 'url' => '/', 'order' => '0', 'enabled' => true],
+        ['label' => 'Contact', 'url' => 'mailto:info@example.com', 'order' => '1', 'enabled' => true],
+    ],
+]);
+$readNavigation = NavigationSettings::read($runtime);
+if ($navigation->toArray() !== $readNavigation->toArray() || count($readNavigation->enabled()) !== 2) {
+    fwrite(STDERR, "navigation conservation failed\n");
+    exit(1);
+}
+
+$invalid = false;
+try {
+    SiteSettings::save($runtime, ['site_language' => 'fr']);
+} catch (Throwable) {
+    $invalid = true;
+}
+if (!$invalid) {
+    fwrite(STDERR, "invalid site language accepted\n");
+    exit(1);
+}
+
+echo "language-site-settings-ok\n";
 PHP
 
 echo "== Conservation tests =="
@@ -407,6 +570,79 @@ if (StaticGenerator::validTheme('custom')) {
 echo "theme-source-ok\n";
 PHP
 
+echo "== Static generation site metadata =="
+"$PHP_BIN" <<'PHP'
+<?php
+define('REPOSITORY_CMS_NO_RUN', true);
+require 'RepositoryCMS/Core/app.php';
+
+use RepositoryCms\Core\Config;
+use RepositoryCms\Core\GitProvider;
+use RepositoryCms\Core\AdSlots;
+use RepositoryCms\Core\NavigationSettings;
+use RepositoryCms\Core\Renderer;
+use RepositoryCms\Core\Runtime;
+use RepositoryCms\Core\SiteSettings;
+use RepositoryCms\Core\StaticGenerator;
+use ServerSideLogicFramework\Auth;
+use ServerSideLogicFramework\LockManager;
+use ServerSideLogicFramework\ServerSideLogicFramework;
+use ServerSideLogicFramework\ServerSideLogicFrameworkClient;
+use ServerSideLogicFramework\WorkData;
+
+final class ReleaseCheckStaticGit implements GitProvider
+{
+    public array $public = [];
+    public function configured(): bool { return true; }
+    public function listContent(): array { return [['path' => 'pages/index.md', 'size' => 7]]; }
+    public function readContent(string $path): string { return '# Hello'; }
+    public function readContentAt(string $path, string $ref): string { return $this->readContent($path); }
+    public function saveContent(string $path, string $bytes, string $message): void {}
+    public function history(string $path): array { return []; }
+    public function readPublicContent(string $path): string { return $this->public[$path] ?? ''; }
+    public function savePublicContent(string $path, string $bytes, string $message): void { $this->public[$path] = $bytes; }
+    public function saveOperationLog(array $event): void {}
+    public function listUpdateReleases(): array { return []; }
+    public function readUpdateFile(string $path): string { return ''; }
+}
+
+$base = sys_get_temp_dir() . '/repository-cms-static-' . bin2hex(random_bytes(4));
+mkdir($base . '/core/Config', 0700, true);
+mkdir($base . '/work', 0700, true);
+file_put_contents($base . '/work/.gitignore', '');
+$locks = new LockManager($base . '/core/Config/cms_lock.json');
+$auth = new Auth($base . '/core/Config/auth.json', $base . '/core/Config/login_state.json', $base . '/core/Config/admin_initial_state.json');
+$workData = new WorkData($base . '/work', $locks);
+$config = new Config('github', 'token', 'owner', 'content', 'public', 'ops', 'updates', 'main', 'updates/releases.json', 'main');
+$git = new ReleaseCheckStaticGit();
+$runtime = new Runtime('RepositoryCMS/Core', $base . '/core/Config', $base . '/work', $config, $git, new ServerSideLogicFrameworkClient(new ServerSideLogicFramework($auth, $locks, $workData)));
+SiteSettings::save($runtime, [
+    'site_name' => 'Example Site',
+    'site_description' => 'Description',
+    'public_url' => 'https://example.com',
+    'site_language' => 'en',
+    'meta_title' => 'Meta Title',
+    'meta_description' => 'Meta Description',
+]);
+AdSlots::save($runtime, [
+    'slots' => [
+        ['id' => 'after_main', 'name' => 'After Main', 'position' => 'after', 'enabled' => true, 'content' => 'Safe Ad'],
+    ],
+]);
+NavigationSettings::save($runtime, [
+    'items' => [
+        ['label' => 'Home', 'url' => '/', 'order' => 0, 'enabled' => true],
+    ],
+]);
+$report = (new StaticGenerator($runtime, new Renderer($runtime->serverSideClient)))->publishReport();
+$html = $git->public['pages/index.html'] ?? '';
+if (($report['succeeded'] ?? 0) !== 1 || !str_contains($html, '<html lang="en">') || !str_contains($html, '<title>Meta Title</title>') || !str_contains($html, '<meta name="description" content="Meta Description">') || !str_contains($html, '<nav class="site-nav"') || !str_contains($html, 'data-ad-slot="after_main"')) {
+    fwrite(STDERR, "static site metadata failed\n");
+    exit(1);
+}
+echo "static-site-metadata-ok\n";
+PHP
+
 echo "== update apply and users =="
 "$PHP_BIN" <<'PHP'
 <?php
@@ -424,7 +660,7 @@ use ServerSideLogicFramework\WorkData;
 
 final class ReleaseCheckUpdateGit implements GitProvider
 {
-    public string $updateBytes = '<?php echo "v0.15";';
+    public string $updateBytes = '<?php echo "v0.17";';
     public bool $badBytes = false;
 
     public function configured(): bool { return true; }
@@ -439,7 +675,7 @@ final class ReleaseCheckUpdateGit implements GitProvider
     public function listUpdateReleases(): array
     {
         return [
-            ['version' => 'v.0.15', 'target_version' => 'v.0.14', 'released_at' => '2026-08-04T00:00:00Z', 'php' => '8.4', 'files' => [['path' => 'Core/app.php', 'source' => 'updates/v0.15/Core/app.php', 'checksum' => hash('sha256', $this->updateBytes)]]],
+            ['version' => 'v.0.17', 'target_version' => 'v.0.16', 'released_at' => '2026-08-04T00:00:00Z', 'php' => '8.4', 'files' => [['path' => 'Core/app.php', 'source' => 'updates/v0.17/Core/app.php', 'checksum' => hash('sha256', $this->updateBytes)]]],
             ['version' => 'v.0.13', 'target_version' => 'v.0.12', 'released_at' => '2026-08-04T00:00:00Z', 'php' => '8.4', 'files' => [['path' => 'Core/app.php', 'source' => 'updates/v0.13/Core/app.php', 'checksum' => str_repeat('a', 64)]]],
             ['version' => 'broken'],
         ];

@@ -46,7 +46,7 @@ final class Bootstrap
 
 final class Config
 {
-    public const VERSION = 'v.0.14';
+    public const VERSION = 'v.0.16';
 
     public function __construct(
         public readonly string $provider,
@@ -570,12 +570,476 @@ final class Renderer
     }
 }
 
+final class LanguageManager
+{
+    private const SUPPORTED = ['ja', 'en'];
+    private static array $cache = [];
+
+    public function __construct(private readonly string $langRoot, private readonly string $locale)
+    {
+    }
+
+    public static function validLocale(string $locale): bool
+    {
+        return in_array($locale, self::SUPPORTED, true);
+    }
+
+    public static function supportedLocales(): array
+    {
+        return self::SUPPORTED;
+    }
+
+    public function t(string $key): string
+    {
+        $current = $this->load($this->locale);
+        if (isset($current[$key]) && is_string($current[$key]) && $current[$key] !== '') {
+            return $current[$key];
+        }
+        $fallback = $this->load('ja');
+        if (isset($fallback[$key]) && is_string($fallback[$key]) && $fallback[$key] !== '') {
+            return $fallback[$key];
+        }
+        return $key;
+    }
+
+    public static function assertLanguageFiles(string $langRoot): void
+    {
+        $ja = self::loadFile($langRoot, 'ja');
+        $en = self::loadFile($langRoot, 'en');
+        $jaKeys = array_keys($ja);
+        $enKeys = array_keys($en);
+        sort($jaKeys);
+        sort($enKeys);
+        if ($jaKeys !== $enKeys) {
+            throw new \RuntimeException('多言語化データのキー構造が一致しません。');
+        }
+    }
+
+    private function load(string $locale): array
+    {
+        return self::loadFile($this->langRoot, self::validLocale($locale) ? $locale : 'ja');
+    }
+
+    private static function loadFile(string $langRoot, string $locale): array
+    {
+        $key = $langRoot . ':' . $locale;
+        if (isset(self::$cache[$key])) {
+            return self::$cache[$key];
+        }
+        $path = $langRoot . '/' . $locale . '.json';
+        if (!is_file($path)) {
+            throw new \RuntimeException('多言語化データが存在しません: ' . $locale);
+        }
+        $bytes = file_get_contents($path);
+        if ($bytes === false) {
+            throw new \RuntimeException('多言語化データを読み取れません: ' . $locale);
+        }
+        $data = json_decode($bytes, true);
+        if (!is_array($data)) {
+            throw new \RuntimeException('多言語化データが不正です: ' . $locale);
+        }
+        foreach ($data as $itemKey => $value) {
+            if (!is_string($itemKey) || !is_string($value) || $value === '') {
+                throw new \RuntimeException('多言語化データの項目が不正です: ' . $locale);
+            }
+        }
+        self::$cache[$key] = $data;
+        return self::$cache[$key];
+    }
+}
+
+final class SiteSettings
+{
+    public function __construct(
+        public readonly string $siteName,
+        public readonly string $siteDescription,
+        public readonly string $publicUrl,
+        public readonly string $siteLanguage,
+        public readonly string $metaTitle,
+        public readonly string $metaDescription,
+    ) {
+    }
+
+    public static function defaults(): self
+    {
+        return new self('Repository CMS', '', '', 'ja', '', '');
+    }
+
+    public static function read(Runtime $runtime): self
+    {
+        $path = self::path($runtime);
+        if (!is_file($path)) {
+            return self::defaults();
+        }
+        $bytes = file_get_contents($path);
+        if ($bytes === false) {
+            $runtime->serverSideClient->lock('サイト基本設定を読み取れません。');
+            throw new \RuntimeException('サイト基本設定を読み取れません。');
+        }
+        $data = json_decode($bytes, true);
+        if (!is_array($data)) {
+            $runtime->serverSideClient->lock('サイト基本設定JSONが不正です。');
+            throw new \RuntimeException('サイト基本設定JSONが不正です。');
+        }
+        return self::fromArray($runtime, $data);
+    }
+
+    public static function safeLocale(Runtime $runtime): string
+    {
+        try {
+            return self::read($runtime)->siteLanguage;
+        } catch (\Throwable) {
+            return 'ja';
+        }
+    }
+
+    public static function save(Runtime $runtime, array $input): self
+    {
+        $runtime->serverSideClient->ensureUnlocked();
+        $settings = self::fromArray($runtime, $input);
+        $payload = json_encode($settings->toArray() + ['updated_at' => gmdate(DATE_ATOM)], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($payload === false || file_put_contents(self::path($runtime), $payload, LOCK_EX) === false) {
+            $runtime->serverSideClient->lock('サイト基本設定を保存できません。');
+            throw new \RuntimeException('サイト基本設定を保存できません。');
+        }
+        $readBack = file_get_contents(self::path($runtime));
+        if ($readBack === false || !hash_equals(hash('sha256', $payload), hash('sha256', $readBack))) {
+            $runtime->serverSideClient->lock('サイト基本設定の保全確認に失敗しました。');
+            throw new \RuntimeException('サイト基本設定の保全確認に失敗しました。');
+        }
+        $verified = self::read($runtime);
+        if ($verified->toArray() !== $settings->toArray()) {
+            $runtime->serverSideClient->lock('サイト基本設定の整合性確認に失敗しました。');
+            throw new \RuntimeException('サイト基本設定の整合性確認に失敗しました。');
+        }
+        return $verified;
+    }
+
+    public function toArray(): array
+    {
+        return [
+            'site_name' => $this->siteName,
+            'site_description' => $this->siteDescription,
+            'public_url' => $this->publicUrl,
+            'site_language' => $this->siteLanguage,
+            'meta_title' => $this->metaTitle,
+            'meta_description' => $this->metaDescription,
+        ];
+    }
+
+    public function pageTitle(string $sourcePath): string
+    {
+        if ($this->metaTitle !== '') {
+            return $this->metaTitle;
+        }
+        if ($this->siteName !== '') {
+            return $this->siteName;
+        }
+        return $sourcePath;
+    }
+
+    public function description(): string
+    {
+        return $this->metaDescription !== '' ? $this->metaDescription : $this->siteDescription;
+    }
+
+    private static function fromArray(Runtime $runtime, array $data): self
+    {
+        $settings = new self(
+            self::stringField($data, 'site_name'),
+            self::stringField($data, 'site_description'),
+            self::stringField($data, 'public_url'),
+            self::stringField($data, 'site_language', 'ja'),
+            self::stringField($data, 'meta_title'),
+            self::stringField($data, 'meta_description'),
+        );
+        if (!LanguageManager::validLocale($settings->siteLanguage)) {
+            $runtime->serverSideClient->lock('サイト基本設定の基本言語が不正です。');
+            throw new \InvalidArgumentException('サイト基本設定の基本言語が不正です。');
+        }
+        if ($settings->publicUrl !== '' && filter_var($settings->publicUrl, FILTER_VALIDATE_URL) === false) {
+            throw new \InvalidArgumentException('公開URLが不正です。');
+        }
+        if ($settings->publicUrl !== '' && !str_starts_with($settings->publicUrl, 'http://') && !str_starts_with($settings->publicUrl, 'https://')) {
+            throw new \InvalidArgumentException('公開URLはhttpまたはhttpsのみ許可します。');
+        }
+        return $settings;
+    }
+
+    private static function stringField(array $data, string $key, string $default = ''): string
+    {
+        $value = $data[$key] ?? $default;
+        if (!is_string($value)) {
+            throw new \InvalidArgumentException('サイト基本設定の項目が不正です: ' . $key);
+        }
+        return trim($value);
+    }
+
+    private static function path(Runtime $runtime): string
+    {
+        return $runtime->configRoot . '/site.json';
+    }
+}
+
+final class AdSlots
+{
+    public function __construct(public readonly array $slots)
+    {
+    }
+
+    public static function defaults(): self
+    {
+        return new self([]);
+    }
+
+    public static function read(Runtime $runtime): self
+    {
+        $path = self::path($runtime);
+        if (!is_file($path)) {
+            return self::defaults();
+        }
+        $bytes = file_get_contents($path);
+        if ($bytes === false) {
+            $runtime->serverSideClient->lock('広告配信枠設定を読み取れません。');
+            throw new \RuntimeException('広告配信枠設定を読み取れません。');
+        }
+        $data = json_decode($bytes, true);
+        if (!is_array($data)) {
+            $runtime->serverSideClient->lock('広告配信枠設定JSONが不正です。');
+            throw new \RuntimeException('広告配信枠設定JSONが不正です。');
+        }
+        return self::fromArray($runtime, $data);
+    }
+
+    public static function save(Runtime $runtime, array $input): self
+    {
+        $runtime->serverSideClient->ensureUnlocked();
+        $settings = self::fromArray($runtime, $input);
+        $payload = json_encode($settings->toArray() + ['updated_at' => gmdate(DATE_ATOM)], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($payload === false || file_put_contents(self::path($runtime), $payload, LOCK_EX) === false) {
+            $runtime->serverSideClient->lock('広告配信枠設定を保存できません。');
+            throw new \RuntimeException('広告配信枠設定を保存できません。');
+        }
+        $readBack = file_get_contents(self::path($runtime));
+        if ($readBack === false || !hash_equals(hash('sha256', $payload), hash('sha256', $readBack))) {
+            $runtime->serverSideClient->lock('広告配信枠設定の保全確認に失敗しました。');
+            throw new \RuntimeException('広告配信枠設定の保全確認に失敗しました。');
+        }
+        $verified = self::read($runtime);
+        if ($verified->toArray() !== $settings->toArray()) {
+            $runtime->serverSideClient->lock('広告配信枠設定の整合性確認に失敗しました。');
+            throw new \RuntimeException('広告配信枠設定の整合性確認に失敗しました。');
+        }
+        return $verified;
+    }
+
+    public function enabled(): array
+    {
+        return array_values(array_filter($this->slots, static fn (array $slot): bool => $slot['enabled'] === true));
+    }
+
+    public function toArray(): array
+    {
+        return ['slots' => $this->slots];
+    }
+
+    private static function fromArray(Runtime $runtime, array $data): self
+    {
+        $slots = $data['slots'] ?? [];
+        if (!is_array($slots)) {
+            $runtime->serverSideClient->lock('広告配信枠設定の項目が不正です。');
+            throw new \InvalidArgumentException('広告配信枠設定の項目が不正です。');
+        }
+        $normalized = [];
+        $seen = [];
+        foreach ($slots as $slot) {
+            if (!is_array($slot)) {
+                $runtime->serverSideClient->lock('広告配信枠設定の広告枠が不正です。');
+                throw new \InvalidArgumentException('広告配信枠設定の広告枠が不正です。');
+            }
+            $id = self::stringField($slot, 'id');
+            $name = self::stringField($slot, 'name');
+            $position = self::stringField($slot, 'position');
+            $content = self::stringField($slot, 'content');
+            $enabled = (bool) ($slot['enabled'] ?? false);
+            if ($id === '' && $name === '' && $position === '' && $content === '') {
+                continue;
+            }
+            if (!preg_match('/^[A-Za-z0-9_-]+$/', $id)) {
+                throw new \InvalidArgumentException('広告枠IDが不正です。');
+            }
+            if (isset($seen[$id])) {
+                throw new \InvalidArgumentException('広告枠IDが重複しています。');
+            }
+            $seen[$id] = true;
+            $normalized[] = [
+                'id' => $id,
+                'name' => $name,
+                'position' => $position,
+                'enabled' => $enabled,
+                'content' => $content,
+            ];
+        }
+        return new self($normalized);
+    }
+
+    private static function stringField(array $data, string $key): string
+    {
+        $value = $data[$key] ?? '';
+        if (!is_string($value)) {
+            throw new \InvalidArgumentException('広告配信枠設定の項目が不正です: ' . $key);
+        }
+        return trim($value);
+    }
+
+    private static function path(Runtime $runtime): string
+    {
+        return $runtime->configRoot . '/ad_slots.json';
+    }
+}
+
+final class NavigationSettings
+{
+    public function __construct(public readonly array $items)
+    {
+    }
+
+    public static function defaults(): self
+    {
+        return new self([]);
+    }
+
+    public static function read(Runtime $runtime): self
+    {
+        $path = self::path($runtime);
+        if (!is_file($path)) {
+            return self::defaults();
+        }
+        $bytes = file_get_contents($path);
+        if ($bytes === false) {
+            $runtime->serverSideClient->lock('ナビゲーション設定を読み取れません。');
+            throw new \RuntimeException('ナビゲーション設定を読み取れません。');
+        }
+        $data = json_decode($bytes, true);
+        if (!is_array($data)) {
+            $runtime->serverSideClient->lock('ナビゲーション設定JSONが不正です。');
+            throw new \RuntimeException('ナビゲーション設定JSONが不正です。');
+        }
+        return self::fromArray($runtime, $data);
+    }
+
+    public static function save(Runtime $runtime, array $input): self
+    {
+        $runtime->serverSideClient->ensureUnlocked();
+        $settings = self::fromArray($runtime, $input);
+        $payload = json_encode($settings->toArray() + ['updated_at' => gmdate(DATE_ATOM)], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($payload === false || file_put_contents(self::path($runtime), $payload, LOCK_EX) === false) {
+            $runtime->serverSideClient->lock('ナビゲーション設定を保存できません。');
+            throw new \RuntimeException('ナビゲーション設定を保存できません。');
+        }
+        $readBack = file_get_contents(self::path($runtime));
+        if ($readBack === false || !hash_equals(hash('sha256', $payload), hash('sha256', $readBack))) {
+            $runtime->serverSideClient->lock('ナビゲーション設定の保全確認に失敗しました。');
+            throw new \RuntimeException('ナビゲーション設定の保全確認に失敗しました。');
+        }
+        $verified = self::read($runtime);
+        if ($verified->toArray() !== $settings->toArray()) {
+            $runtime->serverSideClient->lock('ナビゲーション設定の整合性確認に失敗しました。');
+            throw new \RuntimeException('ナビゲーション設定の整合性確認に失敗しました。');
+        }
+        return $verified;
+    }
+
+    public function enabled(): array
+    {
+        $items = array_values(array_filter($this->items, static fn (array $item): bool => $item['enabled'] === true));
+        usort($items, static fn (array $a, array $b): int => $a['order'] <=> $b['order']);
+        return $items;
+    }
+
+    public function toArray(): array
+    {
+        return ['items' => $this->items];
+    }
+
+    private static function fromArray(Runtime $runtime, array $data): self
+    {
+        $items = $data['items'] ?? [];
+        if (!is_array($items)) {
+            $runtime->serverSideClient->lock('ナビゲーション設定の項目が不正です。');
+            throw new \InvalidArgumentException('ナビゲーション設定の項目が不正です。');
+        }
+        $normalized = [];
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                $runtime->serverSideClient->lock('ナビゲーション設定のメニュー項目が不正です。');
+                throw new \InvalidArgumentException('ナビゲーション設定のメニュー項目が不正です。');
+            }
+            $label = self::stringField($item, 'label');
+            $url = self::stringField($item, 'url');
+            $order = $item['order'] ?? 0;
+            $enabled = (bool) ($item['enabled'] ?? false);
+            if ($label === '' && $url === '') {
+                continue;
+            }
+            if (!is_int($order) && !(is_string($order) && ctype_digit($order))) {
+                throw new \InvalidArgumentException('ナビゲーション表示順が不正です。');
+            }
+            $order = (int) $order;
+            if ($order < 0) {
+                throw new \InvalidArgumentException('ナビゲーション表示順が不正です。');
+            }
+            if (!self::validUrl($url)) {
+                throw new \InvalidArgumentException('ナビゲーションリンク先が不正です。');
+            }
+            $normalized[] = [
+                'label' => $label,
+                'url' => $url,
+                'order' => $order,
+                'enabled' => $enabled,
+            ];
+        }
+        usort($normalized, static fn (array $a, array $b): int => $a['order'] <=> $b['order']);
+        return new self($normalized);
+    }
+
+    private static function validUrl(string $url): bool
+    {
+        if ($url === '' || str_starts_with($url, '/') || str_starts_with($url, './') || str_starts_with($url, '../')) {
+            return true;
+        }
+        if (str_starts_with($url, 'http://') || str_starts_with($url, 'https://')) {
+            return filter_var($url, FILTER_VALIDATE_URL) !== false;
+        }
+        if (str_starts_with($url, 'mailto:')) {
+            return filter_var(substr($url, 7), FILTER_VALIDATE_EMAIL) !== false;
+        }
+        return preg_match('/^[A-Za-z0-9._\/#-]+$/', $url) === 1;
+    }
+
+    private static function stringField(array $data, string $key): string
+    {
+        $value = $data[$key] ?? '';
+        if (!is_string($value)) {
+            throw new \InvalidArgumentException('ナビゲーション設定の項目が不正です: ' . $key);
+        }
+        return trim($value);
+    }
+
+    private static function path(Runtime $runtime): string
+    {
+        return $runtime->configRoot . '/navigation.json';
+    }
+}
+
 final class Response
 {
     public static function html(string $title, string $body, Runtime $runtime, int $status = 200): void
     {
         http_response_code($status);
         header('Content-Type: text/html; charset=utf-8');
+        LanguageManager::assertLanguageFiles($runtime->coreRoot . '/Lang');
+        $translator = new LanguageManager($runtime->coreRoot . '/Lang', SiteSettings::safeLocale($runtime));
         $lock = $runtime->serverSideClient->lockState();
         $user = $runtime->serverSideClient->user();
         $lockHtml = $lock['locked']
@@ -584,14 +1048,14 @@ final class Response
         $nav = '';
         if ($user !== null) {
             $admin = $runtime->serverSideClient->role() === 'admin';
-            $nav = '<nav><a href="?">ダッシュボード</a><a href="?action=new">作成</a><a href="?action=generate">静的生成</a>';
+            $nav = '<nav><a href="?">' . self::escape($translator->t('nav.dashboard')) . '</a><a href="?action=new">' . self::escape($translator->t('nav.create')) . '</a><a href="?action=generate">' . self::escape($translator->t('nav.generate')) . '</a>';
             if ($admin) {
-                $nav .= '<a href="?action=publish">公開</a><a href="?action=themes">テーマ</a><a href="?action=updates">アップデート</a><a href="?action=users">ユーザー</a>';
+                $nav .= '<a href="?action=publish">' . self::escape($translator->t('nav.publish')) . '</a><a href="?action=site_settings">' . self::escape($translator->t('nav.site_settings')) . '</a><a href="?action=ad_slots">' . self::escape($translator->t('nav.ad_slots')) . '</a><a href="?action=navigation">' . self::escape($translator->t('nav.navigation')) . '</a><a href="?action=themes">' . self::escape($translator->t('nav.themes')) . '</a><a href="?action=updates">' . self::escape($translator->t('nav.updates')) . '</a><a href="?action=users">' . self::escape($translator->t('nav.users')) . '</a>';
             }
-            $nav .= '<a href="?action=logout">ログアウト</a></nav>';
+            $nav .= '<a href="?action=logout">' . self::escape($translator->t('nav.logout')) . '</a></nav>';
         }
 
-        echo '<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
+        echo '<!doctype html><html lang="' . self::escape(SiteSettings::safeLocale($runtime)) . '"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
         echo '<title>' . self::escape($title) . ' - Repository CMS</title>';
         echo '<style>' . self::style() . '</style></head><body>';
         echo '<header><h1>Repository CMS <span class="muted">' . self::escape(Config::VERSION) . '</span></h1>' . $nav . '</header><main>' . $lockHtml . $body . '</main></body></html>';
@@ -610,7 +1074,7 @@ final class Response
 
     private static function style(): string
     {
-        return ':root{--primary:#00a968;--secondary:#3498db;--accent:#40AAEF;--surface:#ecf0f1;--border:#ECEEF1;--support:#58BE89;--ink:#17202a;--muted:#697586;--danger:#b42318;--warning:#ad6800}body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;background:var(--surface);color:var(--ink)}header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 24px;background:#fff;border-bottom:1px solid var(--border)}h1{font-size:20px;margin:0}h2{margin:0 0 12px}main{max-width:1120px;margin:24px auto;padding:0 16px}nav{display:flex;gap:8px;flex-wrap:wrap}nav a{border:1px solid var(--border);border-radius:6px;padding:8px 10px;background:#fff}a{color:var(--secondary);text-decoration:none}.page-head{margin-bottom:18px}.page-head h2{font-size:24px}.page-head p{color:var(--muted);margin:6px 0 0}.panel{background:#fff;border:1px solid var(--border);border-radius:8px;padding:18px;margin-bottom:16px}.alert{background:#fff3cd;border:1px solid #ffe08a;border-radius:8px;padding:12px;margin-bottom:16px}.notice{background:#eef9ff;border:1px solid var(--accent);border-radius:8px;padding:12px;margin-bottom:16px}.dashboard-grid,.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px}.status-card,.summary-grid div{background:#fff;border:1px solid var(--border);border-left:4px solid var(--secondary);border-radius:8px;padding:14px}.status-card span,.summary-grid span{display:block;color:var(--muted);font-size:13px;margin-bottom:8px}.status-card strong,.summary-grid strong{font-size:18px}.tone-ok{border-left-color:var(--primary)}.tone-info{border-left-color:var(--secondary)}.tone-warn{border-left-color:var(--warning)}.tone-danger{border-left-color:var(--danger)}.section-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.section-title h2{margin:0}.badge{display:inline-block;background:#e9f8f1;color:#067647;border:1px solid #b7e4cf;border-radius:999px;padding:4px 8px;font-size:12px}.action-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}.action-tile{display:block;border:1px solid var(--border);border-radius:8px;padding:14px;background:#fff}.action-tile strong{display:block;color:var(--ink);margin-bottom:6px}.action-tile span{display:block;color:var(--muted);font-size:14px}.action-tile:hover{border-color:var(--primary)}.action-tile.disabled{background:#f7f8fa;opacity:.65}.theme-option{display:grid;grid-template-columns:auto 1fr 24px 24px 24px;align-items:center;gap:12px;border:1px solid var(--border);border-radius:8px;padding:12px;margin:12px 0}.theme-option em{display:block;color:var(--muted);font-style:normal;font-size:13px}.theme-option i{display:block;width:24px;height:24px;border:1px solid var(--border);border-radius:999px}label:not(.theme-option){display:block;margin:12px 0 6px;font-weight:600}input,textarea,select{width:100%;box-sizing:border-box;border:1px solid #c8d0dc;border-radius:6px;padding:10px;font:inherit}.theme-option input{width:auto}textarea{min-height:360px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}button,.button{display:inline-block;background:var(--primary);color:#fff;border:0;border-radius:6px;padding:10px 14px;font:inherit;cursor:pointer}.button.secondary{background:#eef1f5;color:var(--ink)}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.list{width:100%;border-collapse:collapse}.list th,.list td{text-align:left;border-bottom:1px solid var(--border);padding:10px}.table-actions{display:flex;gap:10px;flex-wrap:wrap}.muted{color:var(--muted)}code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}.preview{background:#fff;border:1px solid var(--border);border-radius:8px;padding:18px}@media(max-width:720px){header{align-items:flex-start;flex-direction:column}nav a{font-size:14px}.section-title{align-items:flex-start;flex-direction:column}.list{display:block;overflow-x:auto}.theme-option{grid-template-columns:auto 1fr}}';
+        return ':root{--primary:#00a968;--secondary:#3498db;--accent:#40AAEF;--surface:#ecf0f1;--border:#ECEEF1;--support:#58BE89;--ink:#17202a;--muted:#697586;--danger:#b42318;--warning:#ad6800}body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;background:var(--surface);color:var(--ink)}header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 24px;background:#fff;border-bottom:1px solid var(--border)}h1{font-size:20px;margin:0}h2{margin:0 0 12px}main{max-width:1120px;margin:24px auto;padding:0 16px}nav{display:flex;gap:8px;flex-wrap:wrap}nav a{border:1px solid var(--border);border-radius:6px;padding:8px 10px;background:#fff}a{color:var(--secondary);text-decoration:none}.page-head{margin-bottom:18px}.page-head h2{font-size:24px}.page-head p{color:var(--muted);margin:6px 0 0}.panel{background:#fff;border:1px solid var(--border);border-radius:8px;padding:18px;margin-bottom:16px}.alert{background:#fff3cd;border:1px solid #ffe08a;border-radius:8px;padding:12px;margin-bottom:16px}.notice{background:#eef9ff;border:1px solid var(--accent);border-radius:8px;padding:12px;margin-bottom:16px}.dashboard-grid,.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px}.status-card,.summary-grid div{background:#fff;border:1px solid var(--border);border-left:4px solid var(--secondary);border-radius:8px;padding:14px}.status-card span,.summary-grid span{display:block;color:var(--muted);font-size:13px;margin-bottom:8px}.status-card strong,.summary-grid strong{font-size:18px}.tone-ok{border-left-color:var(--primary)}.tone-info{border-left-color:var(--secondary)}.tone-warn{border-left-color:var(--warning)}.tone-danger{border-left-color:var(--danger)}.section-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.section-title h2{margin:0}.badge{display:inline-block;background:#e9f8f1;color:#067647;border:1px solid #b7e4cf;border-radius:999px;padding:4px 8px;font-size:12px}.action-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}.action-tile{display:block;border:1px solid var(--border);border-radius:8px;padding:14px;background:#fff}.action-tile strong{display:block;color:var(--ink);margin-bottom:6px}.action-tile span{display:block;color:var(--muted);font-size:14px}.action-tile:hover{border-color:var(--primary)}.action-tile.disabled{background:#f7f8fa;opacity:.65}.theme-option{display:grid;grid-template-columns:auto 1fr 24px 24px 24px;align-items:center;gap:12px;border:1px solid var(--border);border-radius:8px;padding:12px;margin:12px 0}.theme-option em{display:block;color:var(--muted);font-style:normal;font-size:13px}.theme-option i{display:block;width:24px;height:24px;border:1px solid var(--border);border-radius:999px}.settings-row{display:grid;grid-template-columns:80px 1fr 1fr 1fr 90px;gap:10px;align-items:end;border-bottom:1px solid var(--border);padding:12px 0}.settings-row.nav-row{grid-template-columns:80px 1fr 1fr 90px 90px}label:not(.theme-option){display:block;margin:12px 0 6px;font-weight:600}input,textarea,select{width:100%;box-sizing:border-box;border:1px solid #c8d0dc;border-radius:6px;padding:10px;font:inherit}.theme-option input,.settings-row input[type=checkbox]{width:auto}textarea{min-height:360px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}button,.button{display:inline-block;background:var(--primary);color:#fff;border:0;border-radius:6px;padding:10px 14px;font:inherit;cursor:pointer}.button.secondary{background:#eef1f5;color:var(--ink)}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.list{width:100%;border-collapse:collapse}.list th,.list td{text-align:left;border-bottom:1px solid var(--border);padding:10px}.table-actions{display:flex;gap:10px;flex-wrap:wrap}.muted{color:var(--muted)}code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}.preview{background:#fff;border:1px solid var(--border);border-radius:8px;padding:18px}@media(max-width:720px){header{align-items:flex-start;flex-direction:column}nav a{font-size:14px}.section-title{align-items:flex-start;flex-direction:column}.list{display:block;overflow-x:auto}.theme-option,.settings-row,.settings-row.nav-row{grid-template-columns:1fr}}';
     }
 }
 
@@ -691,12 +1155,15 @@ final class StaticGenerator
             'items' => [],
         ];
         $theme = $this->activeTheme();
+        $siteSettings = SiteSettings::read($this->runtime);
+        $adSlots = AdSlots::read($this->runtime);
+        $navigation = NavigationSettings::read($this->runtime);
 
         foreach ($this->runtime->git->listContent() as $item) {
             $sourcePath = (string) ($item['path'] ?? '');
             $report['total']++;
             try {
-                $output = $this->buildOutput($sourcePath, $theme);
+                $output = $this->buildOutput($sourcePath, $theme, $siteSettings, $adSlots, $navigation);
                 $checksum = $this->runtime->serverSideClient->checksum($output['bytes']);
                 $this->validateGeneratedOutput($output['path'], $output['bytes'], $checksum);
                 $workPath = $this->runtime->serverSideClient->writeWorkData(basename($output['path']), $output['bytes']);
@@ -744,7 +1211,7 @@ final class StaticGenerator
         return $report;
     }
 
-    private function buildOutput(string $path, array $theme): array
+    private function buildOutput(string $path, array $theme, SiteSettings $siteSettings, AdSlots $adSlots, NavigationSettings $navigation): array
     {
         if (!$this->runtime->serverSideClient->validContentPath($path)) {
             throw new \InvalidArgumentException('コンテンツパスが不正です。');
@@ -759,7 +1226,7 @@ final class StaticGenerator
             }
             return [
                 'path' => $target,
-                'bytes' => $this->wrapHtml($path, $this->renderer->markdown($bytes), $theme),
+                'bytes' => $this->wrapHtml($path, $this->renderer->markdown($bytes), $theme, $siteSettings, $adSlots, $navigation),
             ];
         }
         if (in_array($extension, ['json', 'png', 'svg'], true)) {
@@ -821,14 +1288,46 @@ final class StaticGenerator
         return $theme['name'] === $name;
     }
 
-    private function wrapHtml(string $sourcePath, string $content, array $theme): string
+    private function wrapHtml(string $sourcePath, string $content, array $theme, SiteSettings $siteSettings, AdSlots $adSlots, NavigationSettings $navigation): string
     {
-        $title = htmlspecialchars($sourcePath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $title = htmlspecialchars($siteSettings->pageTitle($sourcePath), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $description = htmlspecialchars($siteSettings->description(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $lang = htmlspecialchars($siteSettings->siteLanguage, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $siteName = htmlspecialchars($siteSettings->siteName === '' ? 'Repository CMS' : $siteSettings->siteName, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $canonical = $siteSettings->publicUrl === '' ? '' : '<link rel="canonical" href="' . htmlspecialchars(rtrim($siteSettings->publicUrl, '/') . '/' . ltrim($sourcePath, '/'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">';
         $primary = htmlspecialchars($theme['primary'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $secondary = htmlspecialchars($theme['secondary'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $accent = htmlspecialchars($theme['accent'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $themeName = htmlspecialchars($theme['name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-        return '<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' . $title . '</title><style>:root{--primary:' . $primary . ';--secondary:' . $secondary . ';--accent:' . $accent . ';--ink:#17202a;--surface:#ecf0f1}body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:#fff}header{border-bottom:4px solid var(--primary);padding:24px;background:var(--surface)}main{max-width:880px;margin:32px auto;padding:0 20px}a{color:var(--secondary)}.theme-mark{color:var(--accent);font-size:13px}</style></head><body data-theme="' . $themeName . '"><header><strong>Repository CMS</strong><div class="theme-mark">' . $themeName . '</div></header><main>' . $content . '</main></body></html>';
+        $navigationHtml = $this->publicNavigationHtml($navigation);
+        $ads = $this->publicAdSlotsHtml($adSlots);
+        return '<!doctype html><html lang="' . $lang . '"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' . $title . '</title><meta name="description" content="' . $description . '">' . $canonical . '<style>:root{--primary:' . $primary . ';--secondary:' . $secondary . ';--accent:' . $accent . ';--ink:#17202a;--surface:#ecf0f1;--border:#e7edf3}body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:#fff}header{border-bottom:4px solid var(--primary);padding:24px;background:var(--surface)}main{max-width:880px;margin:32px auto;padding:0 20px}a{color:var(--secondary)}.theme-mark{color:var(--accent);font-size:13px}.site-nav{display:flex;gap:12px;flex-wrap:wrap;margin-top:16px}.ad-slot{border:1px solid var(--border);border-left:4px solid var(--accent);padding:12px;margin:18px 0;background:#fafcfe}.ad-slot small{display:block;color:#637083;margin-bottom:4px}</style></head><body data-theme="' . $themeName . '"><header><strong>' . $siteName . '</strong><div class="theme-mark">' . $themeName . '</div>' . $navigationHtml . $ads['header'] . '</header><main>' . $ads['before'] . $content . $ads['after'] . '</main><footer>' . $ads['footer'] . '</footer></body></html>';
+    }
+
+    private function publicNavigationHtml(NavigationSettings $navigation): string
+    {
+        $links = '';
+        foreach ($navigation->enabled() as $item) {
+            $links .= '<a href="' . htmlspecialchars($item['url'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">' . htmlspecialchars($item['label'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</a>';
+        }
+        return $links === '' ? '' : '<nav class="site-nav">' . $links . '</nav>';
+    }
+
+    private function publicAdSlotsHtml(AdSlots $adSlots): array
+    {
+        $groups = ['header' => '', 'before' => '', 'after' => '', 'footer' => ''];
+        foreach ($adSlots->enabled() as $slot) {
+            $position = strtolower((string) $slot['position']);
+            $key = match ($position) {
+                'header' => 'header',
+                'before', 'main_before', 'before_content' => 'before',
+                'after', 'main_after', 'after_content' => 'after',
+                'footer' => 'footer',
+                default => 'after',
+            };
+            $groups[$key] .= '<aside class="ad-slot" data-ad-slot="' . htmlspecialchars($slot['id'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"><small>' . htmlspecialchars($slot['name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</small>' . nl2br(htmlspecialchars($slot['content'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')) . '</aside>';
+        }
+        return $groups;
     }
 
     private function validateGeneratedOutput(string $path, string $bytes, string $checksum): void
@@ -846,6 +1345,18 @@ final class StaticGenerator
             if (!str_starts_with($bytes, '<!doctype html>') || !str_contains($bytes, 'data-theme=')) {
                 $this->runtime->serverSideClient->lock('HTML生成結果が不正です。');
                 throw new \RuntimeException('HTML生成結果が不正です。');
+            }
+            if (!preg_match('/<html lang="(ja|en)">/', $bytes) || !str_contains($bytes, '<title>') || !str_contains($bytes, '<meta name="description"')) {
+                $this->runtime->serverSideClient->lock('HTML生成結果のサイト基本設定反映が不正です。');
+                throw new \RuntimeException('HTML生成結果のサイト基本設定反映が不正です。');
+            }
+            if (!str_contains($bytes, '<nav class="site-nav"') && count(NavigationSettings::read($this->runtime)->enabled()) > 0) {
+                $this->runtime->serverSideClient->lock('HTML生成結果のナビゲーション反映が不正です。');
+                throw new \RuntimeException('HTML生成結果のナビゲーション反映が不正です。');
+            }
+            if (!str_contains($bytes, 'data-ad-slot=') && count(AdSlots::read($this->runtime)->enabled()) > 0) {
+                $this->runtime->serverSideClient->lock('HTML生成結果の広告配信枠反映が不正です。');
+                throw new \RuntimeException('HTML生成結果の広告配信枠反映が不正です。');
             }
             return;
         }
@@ -921,6 +1432,12 @@ final class App
                 'restore' => $this->restore(),
                 'generate' => $this->generate(),
                 'publish' => $this->publish(),
+                'site_settings' => $this->siteSettings(),
+                'site_settings_save' => $this->saveSiteSettings(),
+                'ad_slots' => $this->adSlots(),
+                'ad_slots_save' => $this->saveAdSlots(),
+                'navigation' => $this->navigation(),
+                'navigation_save' => $this->saveNavigation(),
                 'themes' => $this->themes(),
                 'theme_save' => $this->saveTheme(),
                 'updates' => $this->updates(),
@@ -1053,6 +1570,9 @@ final class App
             ['作成', '?action=new', '新しいコンテンツを作成します。', !$locked],
             ['静的生成', '?action=generate', 'コンテンツから公開成果物を生成します。', !$locked],
             ['公開', '?action=publish', '生成成果物を公開リポジトリへ保存します。', !$locked && $admin],
+            ['サイト基本設定', '?action=site_settings', 'サイト名、公開URL、言語、メタ情報を管理します。', !$locked && $admin],
+            ['広告配信枠', '?action=ad_slots', '広告枠ID、表示位置、表示状態、広告内容を管理します。', !$locked && $admin],
+            ['ナビゲーション', '?action=navigation', 'メニュー項目、表示順、リンク先を管理します。', !$locked && $admin],
             ['テーマ', '?action=themes', '静的生成で使用するテーマを選択します。', !$locked && $admin],
             ['アップデート', '?action=updates', '開発元リリースを確認します。', $admin],
             ['ユーザー', '?action=users', '管理者と編集担当を管理します。', !$locked && $admin && $initialDone],
@@ -1207,6 +1727,94 @@ final class App
         }
         $body = '<section class="panel"><h2>テーマ管理</h2><p class="muted">静的生成時に使用する標準テーマを1個選択します。管理画面は公開テーマの影響を受けません。</p><form method="post" action="?action=theme_save"><input type="hidden" name="csrf" value="' . $this->runtime->serverSideClient->csrfToken() . '">' . $rows . '<p><button>保存</button></p></form></section>';
         Response::html('テーマ管理', $body, $this->runtime);
+    }
+
+    private function siteSettings(): void
+    {
+        $settings = SiteSettings::read($this->runtime);
+        $languageOptions = '';
+        foreach (LanguageManager::supportedLocales() as $locale) {
+            $selected = $settings->siteLanguage === $locale ? ' selected' : '';
+            $languageOptions .= '<option value="' . Response::escape($locale) . '"' . $selected . '>' . Response::escape($locale === 'ja' ? '日本語' : 'English') . '</option>';
+        }
+        $body = '<section class="panel"><h2>サイト基本設定</h2><p class="muted">サイト名、公開URL、基本言語、基本メタ情報を管理します。</p><form method="post" action="?action=site_settings_save"><input type="hidden" name="csrf" value="' . $this->runtime->serverSideClient->csrfToken() . '"><label>サイト名</label><input name="site_name" value="' . Response::escape($settings->siteName) . '"><label>サイト説明文</label><input name="site_description" value="' . Response::escape($settings->siteDescription) . '"><label>公開URL</label><input name="public_url" value="' . Response::escape($settings->publicUrl) . '" placeholder="https://example.com"><label>基本言語</label><select name="site_language">' . $languageOptions . '</select><label>メタタイトル</label><input name="meta_title" value="' . Response::escape($settings->metaTitle) . '"><label>メタ説明文</label><input name="meta_description" value="' . Response::escape($settings->metaDescription) . '"><p><button>保存</button></p></form></section>';
+        Response::html('サイト基本設定', $body, $this->runtime);
+    }
+
+    private function saveSiteSettings(): void
+    {
+        if ($this->requestMethod() !== 'POST') {
+            Response::redirect('?action=site_settings');
+        }
+        $this->runtime->serverSideClient->requireCsrf();
+        $settings = SiteSettings::save($this->runtime, [
+            'site_name' => (string) ($_POST['site_name'] ?? ''),
+            'site_description' => (string) ($_POST['site_description'] ?? ''),
+            'public_url' => (string) ($_POST['public_url'] ?? ''),
+            'site_language' => (string) ($_POST['site_language'] ?? 'ja'),
+            'meta_title' => (string) ($_POST['meta_title'] ?? ''),
+            'meta_description' => (string) ($_POST['meta_description'] ?? ''),
+        ]);
+        $this->audit('site_settings.save', ['site_language' => $settings->siteLanguage, 'user' => $this->runtime->serverSideClient->user()]);
+        Response::redirect('?action=site_settings');
+    }
+
+    private function adSlots(): void
+    {
+        $slots = AdSlots::read($this->runtime)->slots;
+        while (count($slots) < 3) {
+            $slots[] = ['id' => '', 'name' => '', 'position' => '', 'enabled' => false, 'content' => ''];
+        }
+        $rows = '';
+        foreach (array_values($slots) as $index => $slot) {
+            $rows .= '<div class="settings-row"><label><input type="checkbox" name="slots[' . $index . '][enabled]" value="1"' . ($slot['enabled'] ? ' checked' : '') . '> 表示</label><div><label>ID</label><input name="slots[' . $index . '][id]" value="' . Response::escape((string) $slot['id']) . '" placeholder="header_main"></div><div><label>名称</label><input name="slots[' . $index . '][name]" value="' . Response::escape((string) $slot['name']) . '"></div><div><label>位置</label><input name="slots[' . $index . '][position]" value="' . Response::escape((string) $slot['position']) . '" placeholder="header / before / after / footer"></div><div><label>広告内容</label><input name="slots[' . $index . '][content]" value="' . Response::escape((string) $slot['content']) . '"></div></div>';
+        }
+        $body = '<section class="panel"><h2>広告配信枠</h2><p class="muted">広告枠の基本情報を管理します。削除は行わず、未使用枠は表示を無効にします。</p><form method="post" action="?action=ad_slots_save"><input type="hidden" name="csrf" value="' . $this->runtime->serverSideClient->csrfToken() . '">' . $rows . '<p><button>保存</button></p></form></section>';
+        Response::html('広告配信枠', $body, $this->runtime);
+    }
+
+    private function saveAdSlots(): void
+    {
+        if ($this->requestMethod() !== 'POST') {
+            Response::redirect('?action=ad_slots');
+        }
+        $this->runtime->serverSideClient->requireCsrf();
+        $slots = $_POST['slots'] ?? [];
+        if (!is_array($slots)) {
+            throw new \InvalidArgumentException('広告配信枠設定の送信内容が不正です。');
+        }
+        $settings = AdSlots::save($this->runtime, ['slots' => $slots]);
+        $this->audit('ad_slots.save', ['count' => count($settings->slots), 'user' => $this->runtime->serverSideClient->user()]);
+        Response::redirect('?action=ad_slots');
+    }
+
+    private function navigation(): void
+    {
+        $items = NavigationSettings::read($this->runtime)->items;
+        while (count($items) < 5) {
+            $items[] = ['label' => '', 'url' => '', 'order' => count($items), 'enabled' => false];
+        }
+        $rows = '';
+        foreach (array_values($items) as $index => $item) {
+            $rows .= '<div class="settings-row nav-row"><label><input type="checkbox" name="items[' . $index . '][enabled]" value="1"' . ($item['enabled'] ? ' checked' : '') . '> 表示</label><div><label>項目名</label><input name="items[' . $index . '][label]" value="' . Response::escape((string) $item['label']) . '"></div><div><label>リンク先</label><input name="items[' . $index . '][url]" value="' . Response::escape((string) $item['url']) . '" placeholder="/"></div><div><label>表示順</label><input name="items[' . $index . '][order]" value="' . Response::escape((string) $item['order']) . '" inputmode="numeric"></div></div>';
+        }
+        $body = '<section class="panel"><h2>ナビゲーション管理</h2><p class="muted">単一ナビゲーションのメニュー項目、表示順、リンク先を管理します。削除は行わず、未使用項目は表示を無効にします。</p><form method="post" action="?action=navigation_save"><input type="hidden" name="csrf" value="' . $this->runtime->serverSideClient->csrfToken() . '">' . $rows . '<p><button>保存</button></p></form></section>';
+        Response::html('ナビゲーション管理', $body, $this->runtime);
+    }
+
+    private function saveNavigation(): void
+    {
+        if ($this->requestMethod() !== 'POST') {
+            Response::redirect('?action=navigation');
+        }
+        $this->runtime->serverSideClient->requireCsrf();
+        $items = $_POST['items'] ?? [];
+        if (!is_array($items)) {
+            throw new \InvalidArgumentException('ナビゲーション設定の送信内容が不正です。');
+        }
+        $settings = NavigationSettings::save($this->runtime, ['items' => $items]);
+        $this->audit('navigation.save', ['count' => count($settings->items), 'user' => $this->runtime->serverSideClient->user()]);
+        Response::redirect('?action=navigation');
     }
 
     private function saveTheme(): void

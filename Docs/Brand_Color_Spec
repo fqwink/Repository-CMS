@@ -91,4 +91,4 @@ v.0.6のテーマ管理では、3個の標準テーマにブランドカラー�
 
 ブランドカラー仕様を変更する場合は、事前にユーザー承認を得る。
 
-承認後、必要に応じて `RepositoryCMS/Docs/Master_Spec`、`RepositoryCMS/Docs/Master_Design`、`RepositoryCMS/Docs/Change_History` を更新する。
+承認後、必要に応じて `Docs/Project_Charter`、`Docs/Brand_Color_Spec`、`Docs/RepositoryCMS/Master_Design`、`Docs/RepositoryCMS/Change_History` を更新する。

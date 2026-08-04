@@ -4,6 +4,14 @@
 
 ---
 
+## v.0.16
+
+- ルート直下 `Docs/` へドキュメントを集約し、Framework設計と変更履歴を `Docs/ServerSideLogicFramework/` へ移行。
+- Frameworkマスター仕様を `Docs/Project_Charter` へ集約し、旧 `ServerSideLogicFramework/Docs/` を廃止。
+- AGENTSとrelease-checkを新ドキュメント構成、旧Docsフォルダ廃止、ルート3系統原則へ更新。
+
+---
+
 ## v.0.15
 
 - UpdateValidatorのCore更新対象をCore直下、Lang、Themes構成へ変更。
