@@ -101,22 +101,82 @@ final class App
     private function index(): void
     {
         if ($this->runtime->locks->locked()) {
-            $state = $this->runtime->locks->state();
-            $body = '<section class="panel"><h2>状態確認</h2><table class="list"><tr><th>状態</th><td>ロック中</td></tr><tr><th>理由</th><td>' . Response::escape((string) $state['reason']) . '</td></tr><tr><th>日時</th><td>' . Response::escape((string) ($state['created_at'] ?? '')) . '</td></tr></table></section>';
+            $body = '<section class="page-head"><h2>状態確認</h2><p>CMSは現在ロック中です。許可された操作のみ実行できます。</p></section>'
+                . $this->statusDashboard()
+                . $this->operationPanel(true);
             Response::html('状態確認', $body, $this->runtime);
             return;
         }
         $notice = $this->updateNotice();
+        $body = '<section class="page-head"><h2>ダッシュボード</h2><p>CMS状態、コンテンツ操作、静的生成、公開操作を確認できます。</p></section>'
+            . $notice
+            . $this->statusDashboard()
+            . $this->operationPanel(false)
+            . $this->contentListPanel();
+        Response::html('ダッシュボード', $body, $this->runtime);
+    }
+
+    private function statusDashboard(): string
+    {
+        $lock = $this->runtime->locks->state();
+        $locked = $lock['locked'] === true;
+        $reason = (string) ($lock['reason'] ?? '');
+        $maintenance = $locked && str_contains($reason, 'メンテナンス');
+        $gitConfigured = $this->runtime->git->configured();
+        $updateConfigured = $this->runtime->config->updateConfigured();
+        $authState = $this->runtime->auth->user() === null ? '未認証' : '認証済み';
+
+        $cards = [
+            ['CMS状態', $locked ? 'ロック中' : '通常稼働', $locked ? 'danger' : 'ok'],
+            ['現在バージョン', Config::VERSION, 'info'],
+            ['メンテナンス状態', $maintenance ? 'メンテナンス中' : '通常', $maintenance ? 'warn' : 'ok'],
+            ['Gitプロバイダー', $gitConfigured ? '設定済み' : '未設定', $gitConfigured ? 'ok' : 'danger'],
+            ['アップデート設定', $updateConfigured ? '設定済み' : '未設定', $updateConfigured ? 'ok' : 'warn'],
+            ['認証状態', $authState, $this->runtime->auth->user() === null ? 'warn' : 'ok'],
+        ];
+
+        $html = '<section class="dashboard-grid" aria-label="CMS状態">';
+        foreach ($cards as [$label, $value, $tone]) {
+            $html .= '<article class="status-card tone-' . Response::escape($tone) . '"><span>' . Response::escape($label) . '</span><strong>' . Response::escape($value) . '</strong></article>';
+        }
+        $html .= '</section>';
+        if ($locked) {
+            $html .= '<section class="panel"><h2>ロック情報</h2><table class="list"><tr><th>理由</th><td>' . Response::escape($reason) . '</td></tr><tr><th>日時</th><td>' . Response::escape((string) ($lock['created_at'] ?? '')) . '</td></tr></table></section>';
+        }
+        return $html;
+    }
+
+    private function operationPanel(bool $locked): string
+    {
+        $disabledNote = $locked ? '<p class="muted">CMSロック中は、状態確認、ログアウト、アップデート状態確認以外の操作は制限されます。</p>' : '';
+        $links = [
+            ['作成', '?action=new', '新しいコンテンツを作成します。', !$locked],
+            ['静的生成', '?action=generate', 'コンテンツから公開成果物を生成します。', !$locked],
+            ['公開', '?action=publish', '生成成果物を公開リポジトリへ保存します。', !$locked],
+            ['アップデート', '?action=updates', '開発元リリースを確認します。', true],
+        ];
+        $html = '<section class="panel"><div class="section-title"><h2>操作</h2><span class="badge">運用</span></div>' . $disabledNote . '<div class="action-grid">';
+        foreach ($links as [$label, $href, $description, $enabled]) {
+            if ($enabled) {
+                $html .= '<a class="action-tile" href="' . Response::escape($href) . '"><strong>' . Response::escape($label) . '</strong><span>' . Response::escape($description) . '</span></a>';
+            } else {
+                $html .= '<div class="action-tile disabled"><strong>' . Response::escape($label) . '</strong><span>' . Response::escape($description) . '</span></div>';
+            }
+        }
+        return $html . '</div></section>';
+    }
+
+    private function contentListPanel(): string
+    {
         $rows = '';
         foreach ($this->content->list() as $item) {
             $path = (string) $item['path'];
-            $rows .= '<tr><td>' . Response::escape($path) . '</td><td>' . (int) $item['size'] . '</td><td><a href="?action=edit&path=' . rawurlencode($path) . '">編集</a> / <a href="?action=history&path=' . rawurlencode($path) . '">履歴</a></td></tr>';
+            $rows .= '<tr><td><code>' . Response::escape($path) . '</code></td><td>' . (int) $item['size'] . '</td><td class="table-actions"><a href="?action=edit&path=' . rawurlencode($path) . '">編集</a><a href="?action=history&path=' . rawurlencode($path) . '">履歴</a></td></tr>';
         }
         if ($rows === '') {
             $rows = '<tr><td colspan="3" class="muted">コンテンツはありません。またはGitプロバイダーが未設定です。</td></tr>';
         }
-        $body = $notice . '<section class="panel"><h2>コンテンツ</h2><table class="list"><tr><th>パス</th><th>サイズ</th><th></th></tr>' . $rows . '</table></section>';
-        Response::html('コンテンツ一覧', $body, $this->runtime);
+        return '<section class="panel"><div class="section-title"><h2>コンテンツ</h2><a class="button secondary" href="?action=new">作成</a></div><table class="list"><tr><th>パス</th><th>サイズ</th><th>操作</th></tr>' . $rows . '</table></section>';
     }
 
     private function edit(?string $path): void
@@ -201,9 +261,9 @@ final class App
             return;
         }
         Security::requireCsrf();
-        $count = (new StaticGenerator($this->runtime, $this->renderer))->generate();
-        $this->audit('static.generate', ['count' => $count, 'user' => $this->runtime->auth->user()]);
-        Response::html('静的生成', '<section class="panel"><h2>静的生成</h2><p>' . $count . ' 件を生成しました。</p></section>', $this->runtime);
+        $report = (new StaticGenerator($this->runtime, $this->renderer))->generateReport();
+        $this->audit('static.generate', ['count' => $report['succeeded'], 'failed' => $report['failed'], 'user' => $this->runtime->auth->user()]);
+        Response::html('静的生成', $this->generationReportHtml('静的生成', $report), $this->runtime);
     }
 
     private function publish(): void
@@ -213,9 +273,25 @@ final class App
             return;
         }
         Security::requireCsrf();
-        $count = (new StaticGenerator($this->runtime, $this->renderer))->publish();
-        $this->audit('static.publish', ['count' => $count, 'user' => $this->runtime->auth->user()]);
-        Response::html('公開', '<section class="panel"><h2>公開</h2><p>' . $count . ' 件を公開しました。</p></section>', $this->runtime);
+        $report = (new StaticGenerator($this->runtime, $this->renderer))->publishReport();
+        $this->audit('static.publish', ['count' => $report['succeeded'], 'failed' => $report['failed'], 'user' => $this->runtime->auth->user()]);
+        Response::html('公開', $this->generationReportHtml('公開', $report), $this->runtime);
+    }
+
+    private function generationReportHtml(string $title, array $report): string
+    {
+        $rows = '';
+        foreach (($report['items'] ?? []) as $item) {
+            $status = (string) ($item['status'] ?? '');
+            $statusLabel = $status === 'success' ? '成功' : '失敗';
+            $reason = (string) ($item['reason'] ?? '');
+            $checksum = (string) ($item['checksum'] ?? '');
+            $rows .= '<tr><td>' . Response::escape((string) ($item['source_path'] ?? '')) . '</td><td>' . Response::escape((string) ($item['output_path'] ?? '')) . '</td><td>' . Response::escape((string) ($item['extension'] ?? '')) . '</td><td><span class="badge">' . Response::escape($statusLabel) . '</span></td><td><code>' . Response::escape($checksum === '' ? '-' : substr($checksum, 0, 16)) . '</code></td><td>' . Response::escape($reason === '' ? '-' : $reason) . '</td></tr>';
+        }
+        if ($rows === '') {
+            $rows = '<tr><td colspan="6" class="muted">生成対象はありません。</td></tr>';
+        }
+        return '<section class="panel"><h2>' . Response::escape($title) . '</h2><div class="summary-grid"><div><span>生成対象</span><strong>' . (int) ($report['total'] ?? 0) . '</strong></div><div><span>成功</span><strong>' . (int) ($report['succeeded'] ?? 0) . '</strong></div><div><span>失敗</span><strong>' . (int) ($report['failed'] ?? 0) . '</strong></div></div><table class="list"><tr><th>生成対象</th><th>出力</th><th>拡張子</th><th>状態</th><th>チェックサム</th><th>理由</th></tr>' . $rows . '</table></section>';
     }
 
     private function updates(): void
@@ -348,7 +424,7 @@ final class App
         if ($count === 0) {
             return '';
         }
-        return '<div class="alert">利用可能なアップデートがあります。<a href="?action=updates">アップデート一覧</a></div>';
+        return '<div class="notice">利用可能なアップデートがあります。<a href="?action=updates">アップデート一覧</a></div>';
     }
 
     private function availableUpdateReleases(): array

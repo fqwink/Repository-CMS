@@ -11,6 +11,7 @@
 
 - `Docs/Master_Spec`
 - `Docs/Master_Design`
+- `Docs/Brand_Color_Spec`
 - `Docs/Change_History`
 
 ## 基本方針
