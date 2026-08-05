@@ -17,10 +17,7 @@ spl_autoload_register(static function (string $class): void {
     if (!is_file($frameworkCopy)) {
         throw new \RuntimeException('ServerSideLogicFramework本体がCoreへ組み込まれていません。');
     }
-    if (!is_file($frameworkSource)) {
-        throw new \RuntimeException('ServerSideLogicFramework本体正本を確認できません。');
-    }
-    if (!hash_equals(hash_file('sha256', $frameworkSource) ?: '', hash_file('sha256', $frameworkCopy) ?: '')) {
+    if (is_file($frameworkSource) && !hash_equals(hash_file('sha256', $frameworkSource) ?: '', hash_file('sha256', $frameworkCopy) ?: '')) {
         throw new \RuntimeException('ServerSideLogicFramework本体が正本と一致しません。');
     }
     require_once $frameworkCopy;
@@ -34,10 +31,7 @@ spl_autoload_register(static function (string $class): void {
     if (!is_file($copy)) {
         throw new \RuntimeException('ServerSideLogicFrameworkクライアントツールがCoreへ組み込まれていません。');
     }
-    if (!is_file($source)) {
-        throw new \RuntimeException('ServerSideLogicFrameworkクライアントツール正本を確認できません。');
-    }
-    if (!hash_equals(hash_file('sha256', $source) ?: '', hash_file('sha256', $copy) ?: '')) {
+    if (is_file($source) && !hash_equals(hash_file('sha256', $source) ?: '', hash_file('sha256', $copy) ?: '')) {
         throw new \RuntimeException('ServerSideLogicFrameworkクライアントツールが正本と一致しません。');
     }
     require_once $copy;
@@ -54,7 +48,7 @@ final class Bootstrap
 
 final class Config
 {
-    public const VERSION = 'v.0.24';
+    public const VERSION = 'v.0.25';
 
     public function __construct(
         public readonly string $provider,

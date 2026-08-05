@@ -1,0 +1,8 @@
+{
+  "name": "standard",
+  "label": "Standard",
+  "description": "汎用サイト向け",
+  "primary": "#00a968",
+  "secondary": "#3498db",
+  "accent": "#40AAEF"
+}

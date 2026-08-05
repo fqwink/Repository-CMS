@@ -1,0 +1,74 @@
+{
+  "name": "repository-cms",
+  "version": "v0.25",
+  "source": "Source/RepositoryCMS",
+  "artifact": "Release/RepositoryCMS",
+  "documentation": "https://github.com/fqwink/Adlaire-Docs",
+  "files": [
+    {
+      "path": "Core/.htaccess",
+      "sha256": "9160dce3fab29b788a7ff96f6f434ea72a96be1af041bd7023097a5b8c68a14e",
+      "size": 510
+    },
+    {
+      "path": "Core/Lang/en.json",
+      "sha256": "862e20a0c15f1ed0c1d37ed106cb304876ebedb6b98958409caa580dfbb6f92c",
+      "size": 487
+    },
+    {
+      "path": "Core/Lang/ja.json",
+      "sha256": "0836e44a17fcd9cfcf8914f6d6749b724e547899baa77059d17c09e1205a9b06",
+      "size": 584
+    },
+    {
+      "path": "Core/ServerSideLogicFramework.php",
+      "sha256": "e055a9f81ced7070c85dc60f301f18574e7fad4c71e307855a5eda09f3f837f4",
+      "size": 44155
+    },
+    {
+      "path": "Core/ServerSideLogicFrameworkClient.php",
+      "sha256": "f8e14a8cbe064c677379ee1168aa6f53ffd3bee10092eccfae32061e7b0a493c",
+      "size": 5434
+    },
+    {
+      "path": "Core/Themes/blog.json",
+      "sha256": "3afd469cfa7f94ac170171b62324d47ca803e2c8e0c6fd25018f8335373e553a",
+      "size": 161
+    },
+    {
+      "path": "Core/Themes/media.json",
+      "sha256": "2997f02fac9dde508abf88674c8b6706b7c2257c70fb4b4d7bd135c8700acdda",
+      "size": 181
+    },
+    {
+      "path": "Core/Themes/standard.json",
+      "sha256": "8f0266604c8b43639f87dda3b1bc33277d46fe0b2813570336bb2992060da856",
+      "size": 163
+    },
+    {
+      "path": "Core/admin-frontend.js",
+      "sha256": "7a29f51d5fe5cb2098d43edfc0777157f2c390389b07efe338283ca5ce6bf38a",
+      "size": 4348
+    },
+    {
+      "path": "Core/app.php",
+      "sha256": "da9a4d1291552901205404ed657027b07a69d619c6f38fbd2fd79f6983957904",
+      "size": 128881
+    },
+    {
+      "path": "Core/static-generator.js",
+      "sha256": "bce621db4958e6d4be5683f1d5384afb6044aabfbd01e5bdca48d59bd1791d16",
+      "size": 2076
+    }
+  ],
+  "protected_paths": [
+    "Core/Config",
+    "Work"
+  ],
+  "excluded_sources": [
+    "*.ts",
+    "Docs",
+    "Source",
+    "Tools"
+  ]
+}

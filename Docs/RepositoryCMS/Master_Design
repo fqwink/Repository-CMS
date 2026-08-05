@@ -2,15 +2,15 @@
 
 # マスター設計書
 
-**Version:** v.0.24
+**Version:** v.0.25
 
 ---
 
 # 1. 設計目的
 
-本設計書は、`Docs/Project_Charter` v.0.24 に基づく Repository CMS の実装構造を簡潔にまとめる。
+本設計書は、`Docs/Project_Charter` v.0.25 に基づく Repository CMS の実装構造を簡潔にまとめる。
 
-v.0.24実装時は、`RepositoryCMS/Core/app.php` 内で管理する実装バージョンを `v.0.24` とする。
+v.0.25では、Adlaire Ecosystem立ち上げ方針、Adlaire-Docs正本管理方式、Adlaire-Ecosystem内の開発正本と公式配布物のフォルダ分離方針を設計対象とする。
 
 仕様・設計・実装は同一バージョンで管理する。
 
@@ -32,6 +32,7 @@ v.0.24実装時は、`RepositoryCMS/Core/app.php` 内で管理する実装バー
 - v.0.22では `StaticGenerator/` の静的生成SEO補助、公開前プレビュー補助をJavaScript生成物へ分離する
 - v.0.23では `AdminFrontend/` と `StaticGenerator/` の複数移行を進め、運用表示補助、履歴表示補助、レポート表示補助、生成レポート整形補助を追加する
 - v.0.24ではTypeScript/JavaScript製移行を優先し、TypeScript正本管理、Core生成済みJavaScript整合確認、release-check検証を強化する
+- v.0.25ではRepository CMSをAdlaire Ecosystem第1適用プロジェクトとし、Adlaire-DocsとAdlaire-Ecosystemへの移行方針を整理する
 - TypeScriptソース正本は開発管理用とし、リリース配布物には含めない
 - 生成済みJavaScriptのみを `RepositoryCMS/Core/` へ実行集約する
 - Node.js必須化、Deno必須化、外部ビルド環境必須化は行わない
@@ -95,6 +96,76 @@ AdminFrontend/
 ```
 
 `public_html/` は採用しない。
+
+v.0.25時点では、現行Repository CMSリポジトリの構成を移行元として維持する。
+
+将来的なAdlaire Ecosystem構成は以下とする。
+
+```text
+Adlaire-Docs/
+  AGENTS.md
+  Group_Charter
+  Documentation_Governance
+  Development_Plan
+  Change_History
+  Development_Source_Policy
+  Repository_Policy
+  Security_Policy
+  Data_Protection_Policy
+  Brand_Color_Spec
+  Release_Policy
+  RepositoryCMS/
+    Project_Charter
+    Master_Design
+    Document_Index
+  ServerSideLogicFramework/
+    Project_Charter
+    Master_Design
+    Document_Index
+  AdminFrontend/
+    Project_Charter
+    Master_Design
+    Document_Index
+  StaticGenerator/
+    Project_Charter
+    Master_Design
+    Document_Index
+  EditorSystem/
+    Project_Charter
+    Master_Design
+    Document_Index
+
+Adlaire-Ecosystem/
+  AGENTS.md
+  Source/
+    RepositoryCMS/
+    ServerSideLogicFramework/
+    AdminFrontend/
+    StaticGenerator/
+    EditorSystem/
+  Release/
+    RepositoryCMS/
+    Packages/
+    Manifests/
+    Checksums/
+  Tools/
+    release-check/
+    build/
+    sync/
+  Work/
+```
+
+`Adlaire-Docs` はドキュメント正本リポジトリとする。
+
+`Adlaire-Ecosystem` は開発正本および公式配布物リポジトリとする。
+
+開発正本リポジトリと配布リポジトリは分離せず、`Source/` と `Release/` でフォルダ分離する。
+
+`Source/` を開発正本領域、`Release/` を公式配布物領域、`Tools/` を生成、同期、検証領域、`Work/` を一時作業領域とする。
+
+`Release/` を直接開発してはならない。
+
+Repository CMSは、Adlaire Ecosystem第1適用プロジェクトとして扱う。
 
 リポジトリルート直下は `Docs/`、`RepositoryCMS/`、`ServerSideLogicFramework/`、特定目的型モジュラーコンポーネントを基本系統とする。
 

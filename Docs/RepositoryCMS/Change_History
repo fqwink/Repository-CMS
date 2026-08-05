@@ -4,6 +4,22 @@
 
 ---
 
+## v.0.49
+
+- 現行Docsの案内として `Docs/README` と `Docs/Document_Source` を追加。
+- AGENTSの必読ドキュメント一覧に移行案内ドキュメントを追加。
+- release-checkでAdlaire-Docs、Adlaire-Ecosystem、Source/Release分離方針の文書存在を確認。
+
+---
+
+## v.0.48
+
+- Adlaire Ecosystemを特定目的型責務ベースのモジュラーコンポーネントアーキテクチャ総称として定義。
+- Adlaire-Docsをドキュメント正本、Adlaire-Ecosystemを開発正本および公式配布物リポジトリとする方針を追加。
+- 開発正本と配布物はリポジトリ分離せず、Adlaire-Ecosystem内のSourceとReleaseでフォルダ分離する方針を明記。
+
+---
+
 ## v.0.47
 
 - 実装バージョンをv.0.24へ更新し、TypeScript/JavaScript製移行優先段階として正本管理を強化。

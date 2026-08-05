@@ -1,0 +1,19 @@
+{
+  "locale": "ja",
+  "name": "日本語",
+  "product": "Repository CMS",
+  "nav.dashboard": "ダッシュボード",
+  "nav.create": "作成",
+  "nav.generate": "静的生成",
+  "nav.publish": "公開",
+  "nav.assets": "素材管理",
+  "nav.site_settings": "サイト基本設定",
+  "nav.ad_slots": "広告配信枠",
+  "nav.navigation": "ナビゲーション",
+  "nav.pages": "固定ページ",
+  "nav.theme_display": "テーマ表示設定",
+  "nav.themes": "テーマ",
+  "nav.updates": "アップデート",
+  "nav.users": "ユーザー",
+  "nav.logout": "ログアウト"
+}

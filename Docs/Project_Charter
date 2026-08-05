@@ -2,7 +2,7 @@
 
 # プロジェクト憲章
 
-**Version:** v\.0\.24
+**Version:** v\.0\.25
 
 ---
 
@@ -10,7 +10,9 @@
 
 本憲章は、Repository CMSおよびServerSideLogicFrameworkのマスター仕様を集約する最上位文書である。
 
-全ドキュメントはリポジトリルート直下の `Docs/` で管理する。
+現行Repository CMSリポジトリでは、移行完了まで全ドキュメントをリポジトリルート直下の `Docs/` で管理する。
+
+将来的な正本管理は、Adlaireグループ公式ドキュメント正本リポジトリ `Adlaire-Docs` へ移行する。
 
 ドキュメント分類は以下とする。
 
@@ -23,6 +25,63 @@
 `Docs/Project_Charter`、`Docs/Development_Plan`、各 `Master_Design` の変更は、事前にユーザー承認を得てから行う。
 
 開発計画案は `Docs/Development_Plan` へ一元管理し、バージョンごとの計画は5行以内で簡潔にまとめる。
+
+Adlaire-Docs移行後は、仕様、設計、横断開発計画、横断変更履歴、ブランド仕様、セキュリティ方針、データ保全方針、リリース方針をAdlaire-Docsの正本ドキュメントに基づいて管理する。
+
+Adlaire-Docsでは、開発計画と変更履歴を横断管理する。横断変更履歴はバージョンごとに3行から5行以内で簡潔にまとめ、詳細は対象プロジェクトの個別ドキュメントを参照する。
+
+Adlaire-Docsのルート直下には全共通ドキュメントとプロジェクト単位フォルダを配置し、`Projects/` などの中間分類フォルダは採用しない。
+
+Adlaire-Docsには `AGENTS.md` を配置し、ドキュメント正本管理、承認、参照、変更、実装前確認の最上位ルールとして扱う。
+
+---
+
+# 0\.1 Adlaire Ecosystem 方針
+
+Adlaireグループが関わるプロジェクトの総称を **Adlaire Ecosystem** とする。
+
+Adlaire Ecosystemは、特定目的型責務ベースのモジュラーコンポーネントアーキテクチャシステムである。
+
+Adlaire Ecosystemは、複数のモジュラーコンポーネントを組み換えることで、CMS、静的生成、管理画面、認証認可、更新管理、編集機能などのシステム開発を高効率に行えることを中核価値とする。
+
+Adlaire Ecosystemのリポジトリ方針は以下とする。
+
+```text
+Adlaire-Docs
+  ドキュメント正本リポジトリ
+
+Adlaire-Ecosystem
+  開発正本および公式配布物リポジトリ
+```
+
+開発正本リポジトリと配布リポジトリは分離しない。
+
+`Adlaire-Ecosystem` 内で開発正本と配布物をフォルダ単位で分離する。
+
+```text
+Adlaire-Ecosystem/
+  AGENTS.md
+  Source/
+  Release/
+  Tools/
+  Work/
+```
+
+`Source/` は開発正本領域とし、TypeScript正本、PHP正本、生成前ソース、テスト用コードを管理する。
+
+`Release/` は利用者向け公式配布物領域とし、生成済みJavaScript、必要なPHP実行物、マニフェスト、チェックサム、配布パッケージを管理する。
+
+`Tools/` は正本から配布物を生成、コピー、検証する処理を管理する。
+
+`Work/` は一時作業領域とし、保全確認後に削除対象とする。
+
+開発は `Source/` で行い、配布物は `Source/` から生成または正本コピーして `Release/` に集約する。
+
+`Release/` を直接開発してはならない。
+
+`Release/` にはTypeScript正本、開発用設定、ビルド設定、テスト専用ファイル、不要な開発ツール、認証情報、利用者データ資産を含めてはならない。
+
+Repository CMSは、Adlaire Ecosystemの第1適用プロジェクトとして扱う。
 
 ---
 

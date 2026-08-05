@@ -1,0 +1,8 @@
+{
+  "name": "media",
+  "label": "Media",
+  "description": "情報発信・広告枠想定サイト向け",
+  "primary": "#40AAEF",
+  "secondary": "#00a968",
+  "accent": "#58BE89"
+}

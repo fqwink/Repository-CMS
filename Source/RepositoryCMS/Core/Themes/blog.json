@@ -1,0 +1,8 @@
+{
+  "name": "blog",
+  "label": "Blog",
+  "description": "記事中心サイト向け",
+  "primary": "#3498db",
+  "secondary": "#00a968",
+  "accent": "#40AAEF"
+}
