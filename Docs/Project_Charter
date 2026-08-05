@@ -2,7 +2,7 @@
 
 # プロジェクト憲章
 
-**Version:** v\.0\.20
+**Version:** v\.0\.24
 
 ---
 
@@ -52,6 +52,19 @@ Repository CMSは、Gitプロバイダーを中心としたコンテンツ管理
 - Web編集専用
 - Gitプロバイダー連携
 
+最重要方針は以下の順序で固定する。
+
+1. データ保全
+2. セキュリティ
+3. 利用者データ資産の非所有
+4. 責務分離
+5. Core最小化
+6. 長期保守
+7. 開発効率
+8. 機能拡張
+
+下位項目は上位項目に反してはならない。
+
 ---
 
 # 2\.1 共通思想
@@ -68,8 +81,9 @@ Repository CMSとServerSideLogicFrameworkは、利用者のデータ資産を安
 2. セキュリティ
 3. 利用者データ資産の非所有
 4. 責務分離
-5. 長期保守
-6. シンプル
+5. Core最小化
+6. 長期保守
+7. シンプル
 
 コンテンツデータ、データベース、公開成果物、運用履歴、認証に関わる保持情報、利用者が作成または管理する設定情報は、利用者のデータ資産である。
 
@@ -121,10 +135,12 @@ Repository CMSは「利用者が何を操作するか」を担当し、ServerSid
 2. セキュリティ
 3. 利用者データ資産の非所有
 4. 責務分離
-5. シンプル
-6. 軽量
-7. 保守性
-8. 拡張性
+5. Core最小化
+6. 長期保守
+7. シンプル
+8. 軽量
+9. 保守性
+10. 拡張性
 
 ---
 
@@ -595,14 +611,19 @@ public\_html/ は採用しない。
     - \.htaccess
     - ServerSideLogicFramework\.php
     - ServerSideLogicFrameworkClient\.php
+    - admin-frontend\.js
+    - static-generator\.js
     - Config/
     - Lang/
     - Themes/
   - Work/
 - ServerSideLogicFramework/
 - StaticGenerator/
+  - static-generator\.ts
 - EditorSystem/
+  - README\.md
 - AdminFrontend/
+  - admin-frontend\.ts
 
 リポジトリルート直下は Docs/、RepositoryCMS/、ServerSideLogicFramework/、特定目的型モジュラーコンポーネントを基本系統とする。
 
@@ -675,6 +696,8 @@ Coreは以下で構成する。
 - \.htaccess
 - ServerSideLogicFramework\.php
 - ServerSideLogicFrameworkClient\.php
+- admin-frontend\.js
+- static-generator\.js
 - Config/
 - Lang/
 - Themes/
@@ -755,7 +778,7 @@ RepositoryCMS/Core/ 直下のファイル数は最大7ファイルを固定原�
 
 RepositoryCMS/Core/ の実行用PHPファイル数は最大3ファイルまでとする。
 
-2ファイルは上限であり、不要なファイル追加は行わない。
+3ファイルは上限であり、不要なPHPファイル追加は行わない。
 
 CMS実行物は原則としてRepositoryCMS/Core/へ集約する。
 
@@ -863,6 +886,9 @@ TypeScript/JavaScript製移行は以下を原則とする。
 - Node\.js必須化はしない
 - Deno必須化はしない
 - 開発時はTypeScriptソースを管理対象にできる
+- TypeScript開発正本は特定目的型モジュラーコンポーネントのルート直下フォルダで管理する
+- `AdminFrontend/admin-frontend.ts` と `StaticGenerator/static-generator.ts` を現行TypeScript開発正本とする
+- `EditorSystem/` は将来のエディタ仕様承認後にTypeScript開発正本を配置する
 - リリース時はレンタルサーバで動作可能なJavaScript生成物を同封する
 - TypeScriptソースコードはリリース配布物に含めない
 - PHP側の `RepositoryCMS/Core/app.php` とServerSideLogicFramework連携は当面維持する
@@ -871,6 +897,8 @@ TypeScript/JavaScript製移行は以下を原則とする。
 - v\.0\.20ではAdminFrontendを初期候補とし、管理画面補助処理から段階移行する
 - v\.0\.21ではAdminFrontend移行を継続し、管理画面入力補助、表示切替、フォーム状態補助を強化する
 - v\.0\.22ではStaticGeneratorを次の候補とし、静的生成SEO補助と公開前プレビュー補助から段階移行する
+- v\.0\.23ではAdminFrontendとStaticGeneratorの複数移行を進め、運用表示補助、履歴表示補助、レポート表示補助、生成レポート整形補助を追加する
+- v\.0\.24ではTypeScript/JavaScript製移行を優先し、AdminFrontendとStaticGeneratorのTypeScript正本管理、Core生成済みJavaScript整合確認、release-check検証を強化する
 
 v\.0\.20のTypeScript/JavaScript製移行初期段階は以下とする。
 
@@ -932,6 +960,48 @@ v\.0\.22では以下を対象外とする。
 - 認証、認可、保存、静的生成、公開、アップデート安全制御のJavaScript移管
 - Node\.js / Deno / npm / 外部パッケージ / CDN必須化
 - TypeScriptソースのリリース同梱
+
+v\.0\.23のTypeScript/JavaScript製移行継続段階は以下とする。
+
+- 移行対象は `AdminFrontend/` と `StaticGenerator/` の両方とする
+- `AdminFrontend/` は運用履歴表示補助、アップデート履歴表示補助、データ保全レポート表示補助を担当する
+- `StaticGenerator/` は生成レポート整形補助、公開前プレビュー補助を担当する
+- 生成済みJavaScriptは既存の `RepositoryCMS/Core/admin-frontend.js` と `RepositoryCMS/Core/static-generator.js` へ実行集約する
+- Core直下ファイル数は最大7ファイル原則を維持し、新しいCore直下ファイルを追加しない
+- TypeScriptソースコードは開発用正本として管理し、リリース配布物には含めない
+- 最終生成判定、保存、公開、認証、認可、CSRF、CMSロック、アップデート安全制御はPHPおよびServerSideLogicFramework経由を維持する
+- JavaScriptが無効でも、CMSの基本操作、保存、静的生成、公開、ロック制御が破綻しないことを必須とする
+- Node\.js、Deno、npm、外部パッケージ、CDN必須化は行わない
+
+v\.0\.23では以下を対象外とする。
+
+- StaticGenerator/ の完全TypeScript/JavaScript化
+- EditorSystem/ の本体実装
+- WYSIWYGエディタ本体
+- 認証、認可、保存、静的生成、公開、アップデート安全制御のJavaScript移管
+- Node\.js / Deno / npm / 外部パッケージ / CDN必須化
+- TypeScriptソースのリリース同梱
+- 新規Core直下ファイルの追加
+
+v\.0\.24のTypeScript/JavaScript製移行優先段階は以下とする。
+
+- 移行対象は引き続き `AdminFrontend/` と `StaticGenerator/` の両方とする
+- `AdminFrontend/admin-frontend.ts` と `StaticGenerator/static-generator.ts` のTypeScript正本管理を強化する
+- Coreへ集約済みの `RepositoryCMS/Core/admin-frontend.js` と `RepositoryCMS/Core/static-generator.js` との整合確認を強化する
+- release-checkでTypeScript正本、Core生成物、配布物混入禁止、禁止依存を検証する
+- 新規Core直下ファイル追加、Node\.js、Deno、npm、CDN必須化は行わない
+
+v\.0\.24では以下を対象外とする。
+
+- アップデート履歴表示改良の本格実装
+- データ保全レポート改良の本格実装
+- EditorSystem/ の本体実装
+- WYSIWYGエディタ本体
+- ブログ機能
+- 認証、認可、保存、静的生成、公開、アップデート安全制御のJavaScript移管
+- Node\.js / Deno / npm / 外部パッケージ / CDN必須化
+- TypeScriptソースのリリース同梱
+- 新規Core直下ファイルの追加
 
 ---
 
@@ -1015,9 +1085,9 @@ CMSは開発元リポジトリからアップデートリリース情報を取�
 
 開発元アップデート対象は、CMS Core実行集約済み実行物に限定する。
 
-CMS Core実行集約済み実行物は、リポジトリ上では `RepositoryCMS/Core/app.php`、`RepositoryCMS/Core/.htaccess`、`RepositoryCMS/Core/admin-frontend.js`、`RepositoryCMS/Core/ServerSideLogicFramework.php`、`RepositoryCMS/Core/ServerSideLogicFrameworkClient.php`、`RepositoryCMS/Core/Lang/`、`RepositoryCMS/Core/Themes/` のみとする。
+CMS Core実行集約済み実行物は、リポジトリ上では `RepositoryCMS/Core/app.php`、`RepositoryCMS/Core/.htaccess`、`RepositoryCMS/Core/admin-frontend.js`、`RepositoryCMS/Core/static-generator.js`、`RepositoryCMS/Core/ServerSideLogicFramework.php`、`RepositoryCMS/Core/ServerSideLogicFrameworkClient.php`、`RepositoryCMS/Core/Lang/`、`RepositoryCMS/Core/Themes/` のみとする。
 
-アップデートリリースのマニフェストパスはCMSルート相対とし、`Core/app.php`、`Core/.htaccess`、`Core/admin-frontend.js`、`Core/ServerSideLogicFramework.php`、`Core/ServerSideLogicFrameworkClient.php`、`Core/Lang/`、`Core/Themes/` を使う。
+アップデートリリースのマニフェストパスはCMSルート相対とし、`Core/app.php`、`Core/.htaccess`、`Core/admin-frontend.js`、`Core/static-generator.js`、`Core/ServerSideLogicFramework.php`、`Core/ServerSideLogicFrameworkClient.php`、`Core/Lang/`、`Core/Themes/` を使う。
 
 特定目的型モジュラーコンポーネント実行用生成物は、CMS Coreへ直接実行集約されたコピーをマニフェスト対象とする。
 
@@ -1030,6 +1100,7 @@ RepositoryCMS/Core/ 内の開発元管理領域の扱いは以下とする。
 - RepositoryCMS/Core/Lang/ はアップデート時に上書き可能
 - RepositoryCMS/Core/Themes/ はアップデート時に上書き可能
 - RepositoryCMS/Core/admin-frontend.js はAdminFrontend生成済みJavaScriptとしてアップデート時に上書き可能
+- RepositoryCMS/Core/static-generator.js はStaticGenerator生成済みJavaScriptとしてアップデート時に上書き可能
 - RepositoryCMS/Core/ServerSideLogicFrameworkClient.php は正本コピーとしてアップデート時に上書き可能
 - RepositoryCMS/Core/ServerSideLogicFramework.php はCMS Core実行集約済み実行物としてアップデート時に上書き可能
 - 特定目的型モジュラーコンポーネントのTypeScript正本はアップデート対象外
@@ -1062,7 +1133,7 @@ RepositoryCMS/Core/ 内の開発元管理領域の扱いは以下とする。
 - 公開成果物
 - CMSサーバ運用履歴
 
-アップデートは `Core/app.php`、`Core/.htaccess`、`Core/admin-frontend.js`、`Core/ServerSideLogicFramework.php`、`Core/ServerSideLogicFrameworkClient.php`、`Core/Lang/`、`Core/Themes/` の置換・追加・修正として行う。
+アップデートは `Core/app.php`、`Core/.htaccess`、`Core/admin-frontend.js`、`Core/static-generator.js`、`Core/ServerSideLogicFramework.php`、`Core/ServerSideLogicFrameworkClient.php`、`Core/Lang/`、`Core/Themes/` の置換・追加・修正として行う。
 
 アップデートによって、`ServerSideLogicFramework/`、`StaticGenerator/`、`EditorSystem/`、`AdminFrontend/`、`RepositoryCMS/Core/Config/`、`RepositoryCMS/Core/App/`、`RepositoryCMS/Core/Data/`、`RepositoryCMS/Modules/`、`RepositoryCMS/Work/`、`Docs/`、特定目的型責務の開発正本、TypeScript正本、作業データ、認証情報、ログイン失敗状態、CMSロック状態、CMS状態、ユーザーテーマ設定、サイト基本設定、広告配信枠設定、ナビゲーション設定、固定ページ設定、テーマ表示設定、運用データベース、コンテンツデータ、公開成果物、運用履歴を変更してはならない。
 
@@ -1108,6 +1179,8 @@ GitHubリポジトリでリリースを作成する際は、そのバージョ�
 リリースには `RepositoryCMS/Core/ServerSideLogicFrameworkClient.php` をCore組み込み済みクライアントとして含める。
 
 リリースには `RepositoryCMS/Core/admin-frontend.js` をAdminFrontend生成済みJavaScriptとして含める。
+
+リリースには `RepositoryCMS/Core/static-generator.js` をStaticGenerator生成済みJavaScriptとして含める。
 
 `ServerSideLogicFramework/ServerSideLogicFramework.php` 本体正本と `ServerSideLogicFramework/ServerSideLogicFrameworkClient.php` クライアント正本は開発元管理用であり、リリース配布物には含めない。
 
@@ -1273,7 +1346,7 @@ TypeScript/JavaScript製移行を進めるバージョンでは例外として�
 
 仕様・設計・実装は同一バージョンで管理する。
 
-本仕様書に記載された内容を v\.0\.18 の対象範囲とする。
+本仕様書に記載された現行計画を v\.0\.24 以降の対象範囲とする。
 
 ---
 
@@ -1289,7 +1362,9 @@ TypeScript/JavaScript製移行を進めるバージョンでは例外として�
 
 ただし、CMSとして必要な基本コンテンツ機能は、運用基盤優先の方針を維持したうえで段階的に前倒しできる。
 
-ブログ機能本体はv\.0\.30で実装対象とし、v\.0\.29までは前提整理に留める。
+ブログ機能本体はv\.0\.29で実装対象とし、v\.0\.28までは前提整理に留める。
+
+WYSIWYGエディタはブログ機能後のv\.0\.30以降に計画対象とする。
 
 開発順序は以下を基本とする。
 
@@ -1301,6 +1376,7 @@ TypeScript/JavaScript製移行を進めるバージョンでは例外として�
 - 広告配信枠
 - 基本コンテンツ機能
 - ブログ
+- WYSIWYGエディタ
 
 ---
 

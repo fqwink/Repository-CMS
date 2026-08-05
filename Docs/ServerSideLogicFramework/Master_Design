@@ -12,6 +12,8 @@
 
 Server Side Logic Frameworkは、Repository CMSとは別責務の安全制御基盤であり、Repository CMSは本フレームワーク仕様に準拠して開発する。
 
+Repository CMS側でTypeScript/JavaScript製移行を進める場合も、Server Side Logic Framework本体とクライアントツールはPHP単一ファイル原則を維持する。
+
 ---
 
 # 2. 配置
@@ -39,6 +41,8 @@ ServerSideLogicFrameworkのマスター設計と変更履歴は `Docs/ServerSide
 `ServerSideLogicFramework/ServerSideLogicFrameworkClient.php` は、Repository CMSのCoreへコピーして組み込むクライアントツール正本とする。
 
 フレームワーク本体およびクライアントツールは、それぞれ単一ファイル原則とする。
+
+ServerSideLogicFrameworkはTypeScript/JavaScript製移行対象外とし、Node.js、Deno、npm、外部ビルド環境を必須にしない。
 
 フレームワーク本体正本は、Repository CMSのCMS Coreへコピーして直接実行集約する。
 

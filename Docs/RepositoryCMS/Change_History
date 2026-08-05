@@ -4,6 +4,38 @@
 
 ---
 
+## v.0.47
+
+- 実装バージョンをv.0.24へ更新し、TypeScript/JavaScript製移行優先段階として正本管理を強化。
+- AdminFrontendとStaticGeneratorのTypeScript正本、Core生成済みJavaScriptへv0.24整合マーカーを追加。
+- release-checkへv0.24マーカー、正本とCore生成物の対応、配布物混入禁止検査を追加し、release-check-okを確認。
+
+---
+
+## v.0.46
+
+- Project Charter、Development Plan、Repository CMS設計、Brand Color、Framework設計を現行v.0.23構成へ整理。
+- 最重要方針、TypeScript正本配置、Core生成済みJavaScript、アップデート対象、配布物方針の重複と不足を修正。
+- ServerSideLogicFrameworkはPHP単一ファイル原則を維持し、TypeScript/JavaScript移行対象外であることを明確化。
+
+---
+
+## v.0.45
+
+- ルート直下に `AdminFrontend/`、`StaticGenerator/`、`EditorSystem/` を配置し、TypeScript開発正本管理を開始。
+- v.0.23実装済みのAdminFrontendとStaticGeneratorにTypeScript正本を追加し、Core側は生成済みJavaScriptのみを維持。
+- release-checkへTypeScript正本フォルダ、Node.js/Deno/npm構成禁止、ルート直下フォルダ検査を追加し、release-check-okを確認。
+
+---
+
+## v.0.44
+
+- 実装バージョンをv.0.23へ更新し、AdminFrontendとStaticGeneratorの既存生成済みJavaScriptを拡張。
+- 運用履歴、アップデート履歴、データ保全レポート、生成レポート、公開前プレビューの補助を追加。
+- release-checkへv.0.23マーカー、複数移行補助、禁止依存、Core直下7ファイル上限、配布物検査を追加し、release-check-okを確認。
+
+---
+
 ## v.0.43
 
 - 実装バージョンをv.0.22へ更新し、StaticGenerator生成済みJavaScriptをCoreへ追加。

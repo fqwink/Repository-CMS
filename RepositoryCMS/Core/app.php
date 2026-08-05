@@ -54,7 +54,7 @@ final class Bootstrap
 
 final class Config
 {
-    public const VERSION = 'v.0.22';
+    public const VERSION = 'v.0.24';
 
     public function __construct(
         public readonly string $provider,

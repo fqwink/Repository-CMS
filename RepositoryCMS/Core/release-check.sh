@@ -33,10 +33,16 @@ if [ -z "${PHP_BIN:-}" ]; then
     if command -v git >/dev/null 2>&1 && [ "${RELEASE_CHECK_GIT_DONE:-0}" != "1" ]; then
       run_git_checks
     fi
+    if [ -n "${RELEASE_PACKAGE_ROOT:-}" ]; then
+      exec "$DOCKER_BIN" run --rm -e RELEASE_CHECK_GIT_DONE=1 -e "RELEASE_PACKAGE_ROOT=$RELEASE_PACKAGE_ROOT" -v "$REPO_ROOT:/app" -v "$RELEASE_PACKAGE_ROOT:$RELEASE_PACKAGE_ROOT" -w /app php:8.4-cli sh "$CMS_DIR/Core/release-check.sh"
+    fi
     exec "$DOCKER_BIN" run --rm -e RELEASE_CHECK_GIT_DONE=1 -v "$REPO_ROOT:/app" -w /app php:8.4-cli sh "$CMS_DIR/Core/release-check.sh"
   elif [ -x /Applications/Docker.app/Contents/Resources/bin/docker ]; then
     if command -v git >/dev/null 2>&1 && [ "${RELEASE_CHECK_GIT_DONE:-0}" != "1" ]; then
       run_git_checks
+    fi
+    if [ -n "${RELEASE_PACKAGE_ROOT:-}" ]; then
+      exec /Applications/Docker.app/Contents/Resources/bin/docker run --rm -e RELEASE_CHECK_GIT_DONE=1 -e "RELEASE_PACKAGE_ROOT=$RELEASE_PACKAGE_ROOT" -v "$REPO_ROOT:/app" -v "$RELEASE_PACKAGE_ROOT:$RELEASE_PACKAGE_ROOT" -w /app php:8.4-cli sh "$CMS_DIR/Core/release-check.sh"
     fi
     exec /Applications/Docker.app/Contents/Resources/bin/docker run --rm -e RELEASE_CHECK_GIT_DONE=1 -v "$REPO_ROOT:/app" -w /app php:8.4-cli sh "$CMS_DIR/Core/release-check.sh"
   else
@@ -94,10 +100,13 @@ fi
 
 echo "== Root directory count =="
 root_dirs=$(find . -mindepth 1 -maxdepth 1 -type d ! -name '.git' -print | sed 's#^\./##' | sort)
-if [ "$root_dirs" != "Docs
+if [ "$root_dirs" != "AdminFrontend
+Docs
+EditorSystem
 RepositoryCMS
-ServerSideLogicFramework" ]; then
-  echo "Repository root directories must be Docs, RepositoryCMS and ServerSideLogicFramework:" >&2
+ServerSideLogicFramework
+StaticGenerator" ]; then
+  echo "Repository root directories must be AdminFrontend, Docs, EditorSystem, RepositoryCMS, ServerSideLogicFramework and StaticGenerator:" >&2
   echo "$root_dirs" >&2
   exit 1
 fi
@@ -187,6 +196,15 @@ else
 fi
 
 echo "== AdminFrontend generated JavaScript =="
+if [ ! -f AdminFrontend/admin-frontend.ts ]; then
+  echo "AdminFrontend TypeScript source canonical file is missing." >&2
+  exit 1
+fi
+if find AdminFrontend -maxdepth 1 \( -name 'package.json' -o -name 'package-lock.json' -o -name 'deno.json' -o -name 'deno.lock' -o -name 'tsconfig.json' \) -print | grep . >/dev/null 2>&1; then
+  echo "AdminFrontend must not require Node.js, Deno, npm or external build configuration." >&2
+  find AdminFrontend -maxdepth 1 \( -name 'package.json' -o -name 'package-lock.json' -o -name 'deno.json' -o -name 'deno.lock' -o -name 'tsconfig.json' \) -print >&2
+  exit 1
+fi
 if [ ! -f "$CMS_DIR/Core/admin-frontend.js" ]; then
   echo "AdminFrontend generated JavaScript is missing from Core." >&2
   exit 1
@@ -201,14 +219,27 @@ if grep -n -E 'fetch\(|XMLHttpRequest|localStorage|sessionStorage|document\.cook
   grep -n -E 'fetch\(|XMLHttpRequest|localStorage|sessionStorage|document\.cookie|eval\(|Function\(|navigator\.sendBeacon|import\(' "$CMS_DIR/Core/admin-frontend.js" >&2
   exit 1
 fi
-for marker in 'data-admin-frontend-version", "v0.21' 'data-admin-form-state' 'data-admin-input-state' 'data-admin-display-toggle' 'data-admin-row-index'; do
+for marker in 'data-admin-frontend-version", "v0.24' 'data-admin-frontend-source", "AdminFrontend/admin-frontend.ts' 'data-admin-frontend-core", "RepositoryCMS/Core/admin-frontend.js' 'data-admin-frontend-integrity", "source-core-aligned' 'data-admin-form-state' 'data-admin-input-state' 'data-admin-display-toggle' 'data-admin-row-index' 'data-admin-operation-history-helper' 'data-admin-update-history-helper' 'data-admin-conservation-report-helper' 'RepositoryCmsAdminFrontend'; do
   if ! grep -F "$marker" "$CMS_DIR/Core/admin-frontend.js" >/dev/null 2>&1; then
-    echo "AdminFrontend v0.21 helper marker is missing: $marker" >&2
+    echo "AdminFrontend v0.24 helper marker is missing from Core generated JavaScript: $marker" >&2
+    exit 1
+  fi
+  if ! grep -F "$marker" AdminFrontend/admin-frontend.ts >/dev/null 2>&1; then
+    echo "AdminFrontend v0.24 helper marker is missing from TypeScript source: $marker" >&2
     exit 1
   fi
 done
 
 echo "== StaticGenerator generated JavaScript =="
+if [ ! -f StaticGenerator/static-generator.ts ]; then
+  echo "StaticGenerator TypeScript source canonical file is missing." >&2
+  exit 1
+fi
+if find StaticGenerator -maxdepth 1 \( -name 'package.json' -o -name 'package-lock.json' -o -name 'deno.json' -o -name 'deno.lock' -o -name 'tsconfig.json' \) -print | grep . >/dev/null 2>&1; then
+  echo "StaticGenerator must not require Node.js, Deno, npm or external build configuration." >&2
+  find StaticGenerator -maxdepth 1 \( -name 'package.json' -o -name 'package-lock.json' -o -name 'deno.json' -o -name 'deno.lock' -o -name 'tsconfig.json' \) -print >&2
+  exit 1
+fi
 if [ ! -f "$CMS_DIR/Core/static-generator.js" ]; then
   echo "StaticGenerator generated JavaScript is missing from Core." >&2
   exit 1
@@ -218,12 +249,23 @@ if grep -n -E 'fetch\(|XMLHttpRequest|localStorage|sessionStorage|document\.cook
   grep -n -E 'fetch\(|XMLHttpRequest|localStorage|sessionStorage|document\.cookie|eval\(|Function\(|navigator\.sendBeacon|import\(' "$CMS_DIR/Core/static-generator.js" >&2
   exit 1
 fi
-for marker in 'data-static-generator-version", "v0.22' 'data-static-generator-seo-helper' 'data-static-generator-preview-helper' 'RepositoryCmsStaticGenerator'; do
+for marker in 'data-static-generator-version", "v0.24' 'data-static-generator-source", "StaticGenerator/static-generator.ts' 'data-static-generator-core", "RepositoryCMS/Core/static-generator.js' 'data-static-generator-integrity", "source-core-aligned' 'data-static-generator-seo-helper' 'data-static-generator-preview-helper' 'data-static-generator-report-helper' 'RepositoryCmsStaticGenerator'; do
   if ! grep -F "$marker" "$CMS_DIR/Core/static-generator.js" >/dev/null 2>&1; then
-    echo "StaticGenerator v0.22 helper marker is missing: $marker" >&2
+    echo "StaticGenerator v0.24 helper marker is missing from Core generated JavaScript: $marker" >&2
+    exit 1
+  fi
+  if ! grep -F "$marker" StaticGenerator/static-generator.ts >/dev/null 2>&1; then
+    echo "StaticGenerator v0.24 helper marker is missing from TypeScript source: $marker" >&2
     exit 1
   fi
 done
+
+core_direct_file_count=$(find "$CMS_DIR/Core" -maxdepth 1 -type f | wc -l | tr -d ' ')
+if [ "$core_direct_file_count" -gt 7 ]; then
+  echo "Core direct file count must be 7 or fewer: $core_direct_file_count" >&2
+  find "$CMS_DIR/Core" -maxdepth 1 -type f -print >&2
+  exit 1
+fi
 
 echo "== Core/Config structure =="
 if find "$CMS_DIR/Core/Config" -mindepth 1 -type d -print | grep . >/dev/null 2>&1; then
@@ -257,9 +299,9 @@ else
   echo "git not found; skipped tracked config check."
 fi
 
-echo "== Future content features not exposed in v0.22 =="
+echo "== Future content features not exposed in v0.24 =="
 if grep -n -E 'blog_post|ブログ投稿' "$CMS_DIR/Core/app.php" AGENTS.md >/dev/null 2>&1; then
-    echo "future content feature code or UI is exposed in v0.22." >&2
+    echo "future content feature code or UI is exposed in v0.24." >&2
   grep -n -E 'blog_post|ブログ投稿' "$CMS_DIR/Core/app.php" AGENTS.md >&2
   exit 1
 fi
@@ -396,7 +438,7 @@ $runtime = render_runtime(sys_get_temp_dir() . '/repository-cms-render-login-' .
 ob_start();
 (new App($runtime))->handle();
 $loginHtml = ob_get_clean();
-if (!is_string($loginHtml) || !str_contains($loginHtml, 'ログイン') || !str_contains($loginHtml, 'v.0.22') || !str_contains($loginHtml, 'admin-frontend.js') || !str_contains($loginHtml, 'static-generator.js')) {
+if (!is_string($loginHtml) || !str_contains($loginHtml, 'ログイン') || !str_contains($loginHtml, 'v.0.24') || !str_contains($loginHtml, 'admin-frontend.js') || !str_contains($loginHtml, 'static-generator.js')) {
     fwrite(STDERR, "login render failed\n");
     exit(1);
 }
@@ -411,7 +453,7 @@ $runtime->serverSideClient->login('owner', 'Password123456');
 ob_start();
 (new App($runtime))->handle();
 $dashboardHtml = ob_get_clean();
-if (!is_string($dashboardHtml) || !str_contains($dashboardHtml, 'ダッシュボード') || !str_contains($dashboardHtml, 'v.0.22') || !str_contains($dashboardHtml, 'admin-frontend.js') || !str_contains($dashboardHtml, 'static-generator.js') || !str_contains($dashboardHtml, '素材管理') || !str_contains($dashboardHtml, '広告配信枠') || !str_contains($dashboardHtml, 'ナビゲーション') || !str_contains($dashboardHtml, '固定ページ') || !str_contains($dashboardHtml, 'テーマ表示設定')) {
+if (!is_string($dashboardHtml) || !str_contains($dashboardHtml, 'ダッシュボード') || !str_contains($dashboardHtml, 'v.0.24') || !str_contains($dashboardHtml, 'admin-frontend.js') || !str_contains($dashboardHtml, 'static-generator.js') || !str_contains($dashboardHtml, '素材管理') || !str_contains($dashboardHtml, '広告配信枠') || !str_contains($dashboardHtml, 'ナビゲーション') || !str_contains($dashboardHtml, '固定ページ') || !str_contains($dashboardHtml, 'テーマ表示設定')) {
     fwrite(STDERR, "dashboard render failed\n");
     exit(1);
 }
@@ -818,9 +860,9 @@ use ServerSideLogicFramework\WorkData;
 
 final class ReleaseCheckUpdateGit implements GitProvider
 {
-    public string $updateBytes = '<?php echo "v0.23";';
-    public string $updateAdminJsBytes = 'document.documentElement.setAttribute("data-update-admin-test","v0.23");';
-    public string $updateStaticJsBytes = 'document.documentElement.setAttribute("data-update-static-test","v0.23");';
+    public string $updateBytes = '<?php echo "v0.25";';
+    public string $updateAdminJsBytes = 'document.documentElement.setAttribute("data-update-admin-test","v0.25");';
+    public string $updateStaticJsBytes = 'document.documentElement.setAttribute("data-update-static-test","v0.25");';
     public bool $badBytes = false;
 
     public function configured(): bool { return true; }
@@ -835,10 +877,10 @@ final class ReleaseCheckUpdateGit implements GitProvider
     public function listUpdateReleases(): array
     {
         return [
-            ['version' => 'v.0.23', 'target_version' => 'v.0.22', 'released_at' => '2026-08-04T00:00:00Z', 'php' => '8.4', 'files' => [
-                ['path' => 'Core/app.php', 'source' => 'updates/v0.23/Core/app.php', 'checksum' => hash('sha256', $this->updateBytes)],
-                ['path' => 'Core/admin-frontend.js', 'source' => 'updates/v0.23/Core/admin-frontend.js', 'checksum' => hash('sha256', $this->updateAdminJsBytes)],
-                ['path' => 'Core/static-generator.js', 'source' => 'updates/v0.23/Core/static-generator.js', 'checksum' => hash('sha256', $this->updateStaticJsBytes)],
+            ['version' => 'v.0.25', 'target_version' => 'v.0.24', 'released_at' => '2026-08-04T00:00:00Z', 'php' => '8.4', 'files' => [
+                ['path' => 'Core/app.php', 'source' => 'updates/v0.25/Core/app.php', 'checksum' => hash('sha256', $this->updateBytes)],
+                ['path' => 'Core/admin-frontend.js', 'source' => 'updates/v0.25/Core/admin-frontend.js', 'checksum' => hash('sha256', $this->updateAdminJsBytes)],
+                ['path' => 'Core/static-generator.js', 'source' => 'updates/v0.25/Core/static-generator.js', 'checksum' => hash('sha256', $this->updateStaticJsBytes)],
             ]],
             ['version' => 'v.0.13', 'target_version' => 'v.0.12', 'released_at' => '2026-08-04T00:00:00Z', 'php' => '8.4', 'files' => [['path' => 'Core/app.php', 'source' => 'updates/v0.13/Core/app.php', 'checksum' => str_repeat('a', 64)]]],
             ['version' => 'broken'],

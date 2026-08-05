@@ -166,27 +166,32 @@
 
 ## v.0.23
 
-- 運用履歴表示改良を行う。
-- CMSサーバ運用履歴を管理画面で確認しやすくする。
-- データ保全とセキュリティ関連の表示を優先する。
+- TypeScript/JavaScript製移行を継続し、`AdminFrontend/` と `StaticGenerator/` の両方を対象とする。
+- `AdminFrontend/admin-frontend.ts` と `StaticGenerator/static-generator.ts` をTypeScript開発正本としてルート直下に配置する。
+- 運用履歴、アップデート履歴、データ保全レポート、生成レポート、公開前プレビューの補助を追加する。
+- 生成済みJavaScriptは `RepositoryCMS/Core/admin-frontend.js` と `RepositoryCMS/Core/static-generator.js` へ実行集約する。
+- Core直下ファイル数は最大7ファイル原則を維持し、新しいCore直下ファイルは追加しない。
 
 ## v.0.24
 
-- アップデート履歴表示改良を行う。
-- アップデート実行履歴を管理画面で確認しやすくする。
-- 成功状態、失敗理由を確認しやすくする。
+- TypeScript/JavaScript製移行を優先して進める。
+- AdminFrontendとStaticGeneratorのTypeScript正本管理を強化する。
+- Coreへ集約済みの生成済みJavaScriptとの整合確認を強化する。
+- release-checkでTypeScript正本、Core生成物、配布物混入禁止、禁止依存を検証する。
+- 新規Core直下ファイル追加、Node.js/Deno/npm/CDN必須化は行わない。
 
 ## v.0.25
+
+- アップデート履歴表示改良を行う。
+- アップデート実行履歴を管理画面で確認しやすくする。
+- 成功状態、失敗理由、対象バージョン、確認状態を見やすくする。
+- AdminFrontend生成済みJavaScriptで表示補助する。
+
+## v.0.26
 
 - データ保全レポート改良を行う。
 - 保存、再取得、チェックサム確認を確認しやすくする。
 - 作業データ削除状態を確認しやすくする。
-
-## v.0.26
-
-- WYSIWYGエディタを計画対象とする。
-- WYSIWYGエディタの詳細仕様は方式決定後に `Docs/Project_Charter` へ明記する。
-- 承認後に設計・実装する。
 
 ## v.0.27
 
@@ -202,17 +207,15 @@
 
 ## v.0.29
 
-- ブログ前提機能の最終整理を継続する。
-- 記事作成、記事一覧、記事詳細の仕様整合性を確認する。
-- 公開日、下書き状態の仕様整合性を確認する。
-- ブログ機能本体は実装しない。
-
-## v.0.30
-
 - ブログ機能を実装する。
 - 記事作成、記事一覧、記事詳細を扱う。
 - 公開日、下書き状態を扱う。
-- 運用基盤、データ保全、セキュリティを優先する。
+
+## v.0.30
+
+- WYSIWYGエディタを計画対象とする。
+- WYSIWYGエディタの詳細仕様は方式決定後に `Docs/Project_Charter` へ明記する。
+- 承認後に設計・実装する。
 
 ## v.0.31以降
 
