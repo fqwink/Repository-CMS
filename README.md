@@ -1,16 +1,16 @@
 # Adlaire Ecosystem
 
-Adlaire Ecosystem is the development source and official release artifact repository for Adlaire group projects.
+Adlaire Ecosystemは、Adlaireグループの開発正本および公式配布物リポジトリです。
 
-Canonical documentation is managed in the public `Adlaire-Docs` repository:
+ドキュメント正本は、公開リポジトリ `Adlaire-Docs` で管理します。
 
 https://github.com/fqwink/Adlaire-Docs
 
-## Repository Layout
+## リポジトリ構成
 
-- `Source/`: development source
-- `Release/`: official release artifacts generated or copied from `Source/`
-- `Tools/`: build, sync, package, and release-check tools
-- `Work/`: temporary work area
+- `Source/`: 開発正本
+- `Release/`: `Source/` から生成またはコピーした公式配布物
+- `Tools/`: ビルド、同期、パッケージ作成、release-check用ツール
+- `Work/`: 一時作業領域
 
-`Release/` must not be edited as development source.
+`Release/` を開発正本として直接編集してはなりません。
