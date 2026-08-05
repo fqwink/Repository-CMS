@@ -58,12 +58,11 @@ fi
 
 echo "== Source layout =="
 root_dirs=$(find . -mindepth 1 -maxdepth 1 -type d ! -name '.git' -print | sed 's#^\./##' | sort)
-if [ "$root_dirs" != "Docs
-Release
+if [ "$root_dirs" != "Release
 Source
 Tools
 Work" ]; then
-  echo "Repository root directories must be Docs, Release, Source, Tools and Work:" >&2
+  echo "Repository root directories must be Release, Source, Tools and Work:" >&2
   echo "$root_dirs" >&2
   exit 1
 fi
@@ -73,8 +72,8 @@ for dir in "$CMS_DIR" "$FRAMEWORK_DIR" "$ADMIN_DIR" "$STATIC_DIR" "$EDITOR_DIR" 
     exit 1
   fi
 done
-if [ ! -f Docs/Document_Source ] || ! grep -F "future canonical documentation repository is" Docs/Document_Source >/dev/null 2>&1; then
-  echo "Legacy Docs must identify Adlaire-Docs as the canonical documentation source." >&2
+if [ -e Docs ]; then
+  echo "Legacy Docs must not remain in Adlaire-Ecosystem." >&2
   exit 1
 fi
 
