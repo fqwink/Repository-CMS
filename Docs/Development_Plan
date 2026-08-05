@@ -150,15 +150,19 @@
 
 ## v.0.21
 
-- 静的生成SEO改良を行う。
-- 基本メタ情報、ページ別メタ情報を強化する。
-- 静的生成時のSEO出力を強化する。
+- TypeScript/JavaScript製移行を継続する。
+- `AdminFrontend/` の管理画面入力補助、表示切替、フォーム状態補助を強化する。
+- 生成済みJavaScriptのみを `RepositoryCMS/Core/admin-frontend.js` へ実行集約する。
+- 認証、認可、CSRF、CMSロック、保存、静的生成、公開、アップデート安全制御はServerSideLogicFramework経由を維持する。
+- Node.js、Deno、npm、外部パッケージ、CDN必須化は行わない。
 
 ## v.0.22
 
-- 公開前プレビュー改良を行う。
-- 公開前の確認画面を強化する。
-- テーマ適用状態、生成予定内容の確認を強化する。
+- TypeScript/JavaScript製移行を継続し、`StaticGenerator/` を次の対象候補とする。
+- 静的生成SEO改良として、基本メタ情報、ページ別メタ情報、SEO出力補助をJavaScript生成物へ分離する。
+- 公開前プレビュー改良として、プレビュー用データ整形補助をJavaScript生成物へ分離する。
+- 生成済みJavaScriptのみを `RepositoryCMS/Core/static-generator.js` へ実行集約する。
+- 最終生成判定、保存、公開、認証、認可、CSRF、CMSロックはPHP/ServerSideLogicFramework側で維持する。
 
 ## v.0.23
 

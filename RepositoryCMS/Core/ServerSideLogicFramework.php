@@ -1032,7 +1032,7 @@ final class UpdateValidator
             $this->addCheck($checks, '取得元 ' . $path, Security::validRepositoryPath($source), $source === '' ? '取得元が空です。' : $source);
             $this->addCheck($checks, 'チェックサム形式 ' . $path, preg_match('/^[a-f0-9]{64}$/', $checksum) === 1, $checksum === '' ? 'チェックサムが空です。' : $checksum);
 
-            if ($this->allowedCoreUpdatePath($path) && in_array($path, ['Core/app.php', 'Core/ServerSideLogicFrameworkClient.php'], true)) {
+            if ($this->allowedCoreUpdatePath($path) && in_array($path, ['Core/app.php', 'Core/ServerSideLogicFramework.php', 'Core/ServerSideLogicFrameworkClient.php'], true)) {
                 $phpTargets[$path] = true;
             }
 
@@ -1047,7 +1047,7 @@ final class UpdateValidator
                 $this->addCheck($checks, 'ファイル取得 ' . $path, false, $error->getMessage());
             }
         }
-        $this->addCheck($checks, 'Core実行用PHPファイル数', count($phpTargets) <= 2, count($phpTargets) . ' files');
+        $this->addCheck($checks, 'Core実行用PHPファイル数', count($phpTargets) <= 3, count($phpTargets) . ' files');
     }
 
     private function allowedCoreUpdatePath(string $path): bool
@@ -1055,7 +1055,7 @@ final class UpdateValidator
         if (!Security::validRepositoryPath($path)) {
             return false;
         }
-        if (in_array($path, ['Core/app.php', 'Core/.htaccess', 'Core/ServerSideLogicFrameworkClient.php'], true)) {
+        if (in_array($path, ['Core/app.php', 'Core/.htaccess', 'Core/admin-frontend.js', 'Core/static-generator.js', 'Core/ServerSideLogicFramework.php', 'Core/ServerSideLogicFrameworkClient.php'], true)) {
             return true;
         }
         if (!str_starts_with($path, 'Core/Lang/') && !str_starts_with($path, 'Core/Themes/')) {
@@ -1079,7 +1079,7 @@ final class UpdateValidator
     private function currentCorePhpFiles(): array
     {
         $files = [];
-        foreach (['app.php', 'ServerSideLogicFrameworkClient.php'] as $file) {
+        foreach (['app.php', 'ServerSideLogicFramework.php', 'ServerSideLogicFrameworkClient.php'] as $file) {
             if (is_file($this->runtime->coreRoot . '/' . $file)) {
                 $files['Core/' . $file] = true;
             }

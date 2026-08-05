@@ -4,6 +4,22 @@
 
 ---
 
+## v.0.21
+
+- UpdateValidatorのCore更新許可対象に `Core/static-generator.js` を追加。
+- Repository CMS v.0.22のStaticGenerator生成物アップデート検証に対応。
+- Framework本体正本とCMS Coreコピーの一致を維持し、release-checkで検証。
+
+---
+
+## v.0.20
+
+- UpdateValidatorのCore更新許可対象に `Core/admin-frontend.js` とFramework本体コピーを追加。
+- Core実行用PHPファイル数検査を最大3ファイル基準へ整理。
+- Repository CMS v.0.20のAdminFrontend生成物アップデート検証に対応。
+
+---
+
 ## v.0.19
 
 - SVG素材検証でスクリプト、イベント属性、外部参照、DOCTYPE、ENTITYを拒否する判定を追加。

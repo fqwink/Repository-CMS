@@ -147,6 +147,8 @@ if [ -n "${RELEASE_PACKAGE_ROOT:-}" ]; then
   for file in \
     "$CMS_DIR/Core/app.php" \
     "$CMS_DIR/Core/.htaccess" \
+    "$CMS_DIR/Core/admin-frontend.js" \
+    "$CMS_DIR/Core/static-generator.js" \
     "$CMS_DIR/Core/ServerSideLogicFramework.php" \
     "$CMS_DIR/Core/ServerSideLogicFrameworkClient.php" \
     "$CMS_DIR/Core/Lang/ja.json" \
@@ -175,9 +177,53 @@ if [ -n "${RELEASE_PACKAGE_ROOT:-}" ]; then
     find "$package_root" -type f -name '*.ts' -print >&2
     exit 1
   fi
+  if find "$package_root/$CMS_DIR/Core" -maxdepth 1 \( -name 'package.json' -o -name 'package-lock.json' -o -name 'deno.json' -o -name 'deno.lock' -o -name 'tsconfig.json' -o -name '*.d.ts' \) -print | grep . >/dev/null 2>&1; then
+    echo "Release package Core must not contain TypeScript build or dependency files." >&2
+    find "$package_root/$CMS_DIR/Core" -maxdepth 1 \( -name 'package.json' -o -name 'package-lock.json' -o -name 'deno.json' -o -name 'deno.lock' -o -name 'tsconfig.json' -o -name '*.d.ts' \) -print >&2
+    exit 1
+  fi
 else
   echo "RELEASE_PACKAGE_ROOT not set; skipped release package artifact check."
 fi
+
+echo "== AdminFrontend generated JavaScript =="
+if [ ! -f "$CMS_DIR/Core/admin-frontend.js" ]; then
+  echo "AdminFrontend generated JavaScript is missing from Core." >&2
+  exit 1
+fi
+if find "$CMS_DIR/Core" -maxdepth 1 \( -name '*.ts' -o -name '*.d.ts' -o -name 'package.json' -o -name 'package-lock.json' -o -name 'deno.json' -o -name 'deno.lock' -o -name 'tsconfig.json' \) -print | grep . >/dev/null 2>&1; then
+  echo "Core must not contain TypeScript source, type definitions, build config, Node.js dependencies or Deno dependencies." >&2
+  find "$CMS_DIR/Core" -maxdepth 1 \( -name '*.ts' -o -name '*.d.ts' -o -name 'package.json' -o -name 'package-lock.json' -o -name 'deno.json' -o -name 'deno.lock' -o -name 'tsconfig.json' \) -print >&2
+  exit 1
+fi
+if grep -n -E 'fetch\(|XMLHttpRequest|localStorage|sessionStorage|document\.cookie|eval\(|Function\(|navigator\.sendBeacon|import\(' "$CMS_DIR/Core/admin-frontend.js" >/dev/null 2>&1; then
+  echo "AdminFrontend generated JavaScript must remain UI-helper only and must not access API, storage, cookies or dynamic code execution." >&2
+  grep -n -E 'fetch\(|XMLHttpRequest|localStorage|sessionStorage|document\.cookie|eval\(|Function\(|navigator\.sendBeacon|import\(' "$CMS_DIR/Core/admin-frontend.js" >&2
+  exit 1
+fi
+for marker in 'data-admin-frontend-version", "v0.21' 'data-admin-form-state' 'data-admin-input-state' 'data-admin-display-toggle' 'data-admin-row-index'; do
+  if ! grep -F "$marker" "$CMS_DIR/Core/admin-frontend.js" >/dev/null 2>&1; then
+    echo "AdminFrontend v0.21 helper marker is missing: $marker" >&2
+    exit 1
+  fi
+done
+
+echo "== StaticGenerator generated JavaScript =="
+if [ ! -f "$CMS_DIR/Core/static-generator.js" ]; then
+  echo "StaticGenerator generated JavaScript is missing from Core." >&2
+  exit 1
+fi
+if grep -n -E 'fetch\(|XMLHttpRequest|localStorage|sessionStorage|document\.cookie|eval\(|Function\(|navigator\.sendBeacon|import\(' "$CMS_DIR/Core/static-generator.js" >/dev/null 2>&1; then
+  echo "StaticGenerator generated JavaScript must remain helper only and must not access API, storage, cookies or dynamic code execution." >&2
+  grep -n -E 'fetch\(|XMLHttpRequest|localStorage|sessionStorage|document\.cookie|eval\(|Function\(|navigator\.sendBeacon|import\(' "$CMS_DIR/Core/static-generator.js" >&2
+  exit 1
+fi
+for marker in 'data-static-generator-version", "v0.22' 'data-static-generator-seo-helper' 'data-static-generator-preview-helper' 'RepositoryCmsStaticGenerator'; do
+  if ! grep -F "$marker" "$CMS_DIR/Core/static-generator.js" >/dev/null 2>&1; then
+    echo "StaticGenerator v0.22 helper marker is missing: $marker" >&2
+    exit 1
+  fi
+done
 
 echo "== Core/Config structure =="
 if find "$CMS_DIR/Core/Config" -mindepth 1 -type d -print | grep . >/dev/null 2>&1; then
@@ -211,9 +257,9 @@ else
   echo "git not found; skipped tracked config check."
 fi
 
-echo "== Future content features not exposed in v0.19 =="
+echo "== Future content features not exposed in v0.22 =="
 if grep -n -E 'blog_post|ブログ投稿' "$CMS_DIR/Core/app.php" AGENTS.md >/dev/null 2>&1; then
-    echo "future content feature code or UI is exposed in v0.19." >&2
+    echo "future content feature code or UI is exposed in v0.22." >&2
   grep -n -E 'blog_post|ブログ投稿' "$CMS_DIR/Core/app.php" AGENTS.md >&2
   exit 1
 fi
@@ -331,6 +377,8 @@ function render_runtime(string $base): Runtime
     mkdir($base . '/core', 0700, true);
     mkdir($base . '/core/Lang', 0700, true);
     file_put_contents($base . '/work/.gitignore', '');
+    copy('RepositoryCMS/Core/admin-frontend.js', $base . '/core/admin-frontend.js');
+    copy('RepositoryCMS/Core/static-generator.js', $base . '/core/static-generator.js');
     copy('RepositoryCMS/Core/Lang/ja.json', $base . '/core/Lang/ja.json');
     copy('RepositoryCMS/Core/Lang/en.json', $base . '/core/Lang/en.json');
     $auth = new Auth($base . '/config/auth.json', $base . '/config/login_state.json', $base . '/config/admin_initial_state.json');
@@ -348,7 +396,7 @@ $runtime = render_runtime(sys_get_temp_dir() . '/repository-cms-render-login-' .
 ob_start();
 (new App($runtime))->handle();
 $loginHtml = ob_get_clean();
-if (!is_string($loginHtml) || !str_contains($loginHtml, 'ログイン') || !str_contains($loginHtml, 'v.0.19')) {
+if (!is_string($loginHtml) || !str_contains($loginHtml, 'ログイン') || !str_contains($loginHtml, 'v.0.22') || !str_contains($loginHtml, 'admin-frontend.js') || !str_contains($loginHtml, 'static-generator.js')) {
     fwrite(STDERR, "login render failed\n");
     exit(1);
 }
@@ -363,7 +411,7 @@ $runtime->serverSideClient->login('owner', 'Password123456');
 ob_start();
 (new App($runtime))->handle();
 $dashboardHtml = ob_get_clean();
-if (!is_string($dashboardHtml) || !str_contains($dashboardHtml, 'ダッシュボード') || !str_contains($dashboardHtml, 'v.0.19') || !str_contains($dashboardHtml, '素材管理') || !str_contains($dashboardHtml, '広告配信枠') || !str_contains($dashboardHtml, 'ナビゲーション') || !str_contains($dashboardHtml, '固定ページ') || !str_contains($dashboardHtml, 'テーマ表示設定')) {
+if (!is_string($dashboardHtml) || !str_contains($dashboardHtml, 'ダッシュボード') || !str_contains($dashboardHtml, 'v.0.22') || !str_contains($dashboardHtml, 'admin-frontend.js') || !str_contains($dashboardHtml, 'static-generator.js') || !str_contains($dashboardHtml, '素材管理') || !str_contains($dashboardHtml, '広告配信枠') || !str_contains($dashboardHtml, 'ナビゲーション') || !str_contains($dashboardHtml, '固定ページ') || !str_contains($dashboardHtml, 'テーマ表示設定')) {
     fwrite(STDERR, "dashboard render failed\n");
     exit(1);
 }
@@ -770,7 +818,9 @@ use ServerSideLogicFramework\WorkData;
 
 final class ReleaseCheckUpdateGit implements GitProvider
 {
-    public string $updateBytes = '<?php echo "v0.20";';
+    public string $updateBytes = '<?php echo "v0.23";';
+    public string $updateAdminJsBytes = 'document.documentElement.setAttribute("data-update-admin-test","v0.23");';
+    public string $updateStaticJsBytes = 'document.documentElement.setAttribute("data-update-static-test","v0.23");';
     public bool $badBytes = false;
 
     public function configured(): bool { return true; }
@@ -785,12 +835,28 @@ final class ReleaseCheckUpdateGit implements GitProvider
     public function listUpdateReleases(): array
     {
         return [
-            ['version' => 'v.0.20', 'target_version' => 'v.0.19', 'released_at' => '2026-08-04T00:00:00Z', 'php' => '8.4', 'files' => [['path' => 'Core/app.php', 'source' => 'updates/v0.20/Core/app.php', 'checksum' => hash('sha256', $this->updateBytes)]]],
+            ['version' => 'v.0.23', 'target_version' => 'v.0.22', 'released_at' => '2026-08-04T00:00:00Z', 'php' => '8.4', 'files' => [
+                ['path' => 'Core/app.php', 'source' => 'updates/v0.23/Core/app.php', 'checksum' => hash('sha256', $this->updateBytes)],
+                ['path' => 'Core/admin-frontend.js', 'source' => 'updates/v0.23/Core/admin-frontend.js', 'checksum' => hash('sha256', $this->updateAdminJsBytes)],
+                ['path' => 'Core/static-generator.js', 'source' => 'updates/v0.23/Core/static-generator.js', 'checksum' => hash('sha256', $this->updateStaticJsBytes)],
+            ]],
             ['version' => 'v.0.13', 'target_version' => 'v.0.12', 'released_at' => '2026-08-04T00:00:00Z', 'php' => '8.4', 'files' => [['path' => 'Core/app.php', 'source' => 'updates/v0.13/Core/app.php', 'checksum' => str_repeat('a', 64)]]],
             ['version' => 'broken'],
         ];
     }
-    public function readUpdateFile(string $path): string { return $this->badBytes ? 'bad' : $this->updateBytes; }
+    public function readUpdateFile(string $path): string
+    {
+        if ($this->badBytes) {
+            return 'bad';
+        }
+        if (str_ends_with($path, 'admin-frontend.js')) {
+            return $this->updateAdminJsBytes;
+        }
+        if (str_ends_with($path, 'static-generator.js')) {
+            return $this->updateStaticJsBytes;
+        }
+        return $this->updateBytes;
+    }
 }
 
 $base = sys_get_temp_dir() . '/repository-cms-release-update-' . bin2hex(random_bytes(4));
@@ -799,6 +865,8 @@ mkdir($base . '/work', 0700, true);
 mkdir($base . '/core', 0700, true);
 file_put_contents($base . '/work/.gitignore', '');
 file_put_contents($base . '/core/app.php', '<?php echo "old";');
+file_put_contents($base . '/core/admin-frontend.js', 'document.documentElement.setAttribute("data-old","true");');
+file_put_contents($base . '/core/static-generator.js', 'document.documentElement.setAttribute("data-old-static","true");');
 file_put_contents($base . '/core/ServerSideLogicFramework.php', file_get_contents('ServerSideLogicFramework/ServerSideLogicFramework.php'));
 file_put_contents($base . '/core/ServerSideLogicFrameworkClient.php', file_get_contents('ServerSideLogicFramework/ServerSideLogicFrameworkClient.php'));
 file_put_contents($base . '/config/auth.json', json_encode([
@@ -822,7 +890,7 @@ if ($report['valid'] !== true) {
     exit(1);
 }
 $report = $runtime->serverSideClient->applyUpdate($runtime, $git->listUpdateReleases()[0], 'メンテナンス解除待機中です。');
-if ($report['valid'] !== true || file_get_contents($base . '/core/app.php') !== $git->updateBytes || $locks->state()['reason'] !== 'メンテナンス解除待機中です。') {
+if ($report['valid'] !== true || file_get_contents($base . '/core/app.php') !== $git->updateBytes || file_get_contents($base . '/core/admin-frontend.js') !== $git->updateAdminJsBytes || file_get_contents($base . '/core/static-generator.js') !== $git->updateStaticJsBytes || $locks->state()['reason'] !== 'メンテナンス解除待機中です。') {
     fwrite(STDERR, "update apply failed\n");
     exit(1);
 }

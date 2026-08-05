@@ -4,6 +4,30 @@
 
 ---
 
+## v.0.43
+
+- 実装バージョンをv.0.22へ更新し、StaticGenerator生成済みJavaScriptをCoreへ追加。
+- `static-generator.js` をSEO補助、メタ情報整形補助、公開前プレビュー補助に限定。
+- release-checkへv.0.22描画、StaticGenerator補助マーカー、禁止依存、配布物検査を追加し、release-check-okを確認。
+
+---
+
+## v.0.42
+
+- 実装バージョンをv.0.21へ更新し、AdminFrontendの入力補助、表示切替、フォーム状態補助を強化。
+- `admin-frontend.js` をAPI通信、Cookie、Storage、動的コード実行なしのUI補助に限定。
+- release-checkへv.0.21描画、AdminFrontend補助マーカー、禁止依存、配布物検査を追加し、release-check-okを確認。
+
+---
+
+## v.0.41
+
+- 実装バージョンをv.0.20へ更新し、AdminFrontend生成済みJavaScriptをCoreへ追加。
+- 管理画面で `admin-frontend.js` を読み込み、JavaScript無効時も安全判定をPHP/Framework側に維持。
+- release-checkへAdminFrontend生成物、TypeScript混入禁止、v.0.20描画、アップデート検証を追加し、release-check-okを確認。
+
+---
+
 ## v.0.40
 
 - 実装バージョンをv.0.19へ更新し、PNG/SVG素材管理画面、素材チェックサム表示、管理者専用導線を追加。

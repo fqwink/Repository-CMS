@@ -93,10 +93,10 @@
 - `ServerSideLogicFramework/` を別リポジトリへ分割する計画は廃止すること。
 - 現在のRepository CMSを活用し、サーバーサイドロジックフレームワーク部分と今後のCMS部分を段階的に分離して、フレームワーク安定版ができるまで進めること。
 - 承認済み構成方針では、`RepositoryCMS/Core/` 直下フォルダは最大3フォルダとし、現行方針は `RepositoryCMS/Core/Config/`、`RepositoryCMS/Core/Lang/`、`RepositoryCMS/Core/Themes/` の3フォルダとすること。
-- 開発元のアップデート更新対象は `RepositoryCMS/Core/app.php`、`RepositoryCMS/Core/.htaccess`、`RepositoryCMS/Core/ServerSideLogicFramework.php`、`RepositoryCMS/Core/ServerSideLogicFrameworkClient.php`、`RepositoryCMS/Core/Lang/`、`RepositoryCMS/Core/Themes/` のCMS Core実行集約済み実行物のみとすること。
-- アップデートリリースのマニフェストパスはCMSルート相対とし、`Core/app.php`、`Core/.htaccess`、`Core/ServerSideLogicFramework.php`、`Core/ServerSideLogicFrameworkClient.php`、`Core/Lang/`、`Core/Themes/` を使うこと。
+- 開発元のアップデート更新対象は `RepositoryCMS/Core/app.php`、`RepositoryCMS/Core/.htaccess`、`RepositoryCMS/Core/admin-frontend.js`、`RepositoryCMS/Core/ServerSideLogicFramework.php`、`RepositoryCMS/Core/ServerSideLogicFrameworkClient.php`、`RepositoryCMS/Core/Lang/`、`RepositoryCMS/Core/Themes/` のCMS Core実行集約済み実行物のみとすること。
+- アップデートリリースのマニフェストパスはCMSルート相対とし、`Core/app.php`、`Core/.htaccess`、`Core/admin-frontend.js`、`Core/ServerSideLogicFramework.php`、`Core/ServerSideLogicFrameworkClient.php`、`Core/Lang/`、`Core/Themes/` を使うこと。
 - 開発元は特定目的型責務の開発正本を更新、改良、バグ修正し、正本コピーまたは生成物を `RepositoryCMS/Core/` へ自動集約すること。
-- エンドユーザーへ `RepositoryCMS/Core/app.php`、`RepositoryCMS/Core/ServerSideLogicFramework.php`、`RepositoryCMS/Core/ServerSideLogicFrameworkClient.php`、`RepositoryCMS/Core/Lang/`、`RepositoryCMS/Core/Themes/` の変更、修正、カスタマイズ権限を与えないこと。
+- エンドユーザーへ `RepositoryCMS/Core/app.php`、`RepositoryCMS/Core/admin-frontend.js`、`RepositoryCMS/Core/ServerSideLogicFramework.php`、`RepositoryCMS/Core/ServerSideLogicFrameworkClient.php`、`RepositoryCMS/Core/Lang/`、`RepositoryCMS/Core/Themes/` の変更、修正、カスタマイズ権限を与えないこと。
 - テーマ関連ソースコードは `RepositoryCMS/Core/Themes/` で開発元管理とし、アップデート時に上書きされる前提とすること。
 - ユーザーによるテーマ関連ソースコードの修正・カスタマイズを前提にしないこと。
 - 多言語化データは `RepositoryCMS/Core/Lang/` で開発元管理とし、アップデート時に上書きされる前提とすること。

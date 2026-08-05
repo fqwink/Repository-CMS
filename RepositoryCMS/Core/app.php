@@ -54,7 +54,7 @@ final class Bootstrap
 
 final class Config
 {
-    public const VERSION = 'v.0.19';
+    public const VERSION = 'v.0.22';
 
     public function __construct(
         public readonly string $provider,
@@ -1277,9 +1277,15 @@ final class Response
             $nav .= '<a href="?action=logout">' . self::escape($translator->t('nav.logout')) . '</a></nav>';
         }
 
+        $adminFrontendScript = is_file($runtime->coreRoot . '/admin-frontend.js')
+            ? '<script src="admin-frontend.js" defer></script>'
+            : '';
+        $staticGeneratorScript = is_file($runtime->coreRoot . '/static-generator.js')
+            ? '<script src="static-generator.js" defer></script>'
+            : '';
         echo '<!doctype html><html lang="' . self::escape(SiteSettings::safeLocale($runtime)) . '"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
         echo '<title>' . self::escape($title) . ' - Repository CMS</title>';
-        echo '<style>' . self::style() . '</style></head><body>';
+        echo '<style>' . self::style() . '</style>' . $adminFrontendScript . $staticGeneratorScript . '</head><body>';
         echo '<header><h1>Repository CMS <span class="muted">' . self::escape(Config::VERSION) . '</span></h1>' . $nav . '</header><main>' . $lockHtml . $body . '</main></body></html>';
     }
 
